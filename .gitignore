@@ -1,0 +1,64 @@
+# === 大文件 / 视频素材 ===
+# AI 视频项目常产生大体积文件,默认不提交,改用外部存储 / LFS
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.gif
+*.wav
+*.mp3
+*.flac
+*.png
+*.jpg
+*.jpeg
+# 如需保留少量样例,取消注释下面这行或使用 git add -f
+# !assets/samples/**
+
+# === 模型权重 / 缓存 ===
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.onnx
+.cache/
+models/
+checkpoints/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# === Node ===
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# === 环境变量 / 密钥 ===
+.env
+.env.*
+!.env.example
+*.key
+secrets.json
+
+# === 编辑器 / 系统 ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tmp
+
+# === 输出目录 ===
+output/
+outputs/
+results/
+tmp/
