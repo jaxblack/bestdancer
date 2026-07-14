@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BestDancer 工作台</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="overrides.css">
+</head>
+<body>
+  <header><div class="brand">BEST<span>DANCER</span><small>LOCAL STUDIO</small></div><div class="episode"><label>制作周次<select id="week" aria-label="制作周次"></select></label><label>范围<select id="workspace-range" aria-label="最近周数"><option value="8">最近 8 周</option><option value="12" selected>最近 12 周</option><option value="24">最近 24 周</option></select></label><button class="icon" id="reload" title="刷新工作区">↻</button></div><button class="primary" id="render">生成本期视频</button></header>
+  <main>
+    <aside>
+      <div class="rail-title">制作流程</div>
+      <nav><a class="active" href="#discover">01 热度发现</a><a href="#candidates">02 候选与编排</a><a href="#submit">03 投稿补充</a><a href="#produce">04 成片输出</a></nav>
+      <section class="status"><b>工作区状态</b><span id="status">正在载入</span><div id="workspace-list" class="workspace-list" aria-label="已载入工作区"></div><pre id="job-output"></pre></section>
+    </aside>
+    <div class="content">
+      <section id="discover" class="panel hero"><div><p class="eyebrow">WEEKLY DISCOVERY</p><h1>本周街舞热度榜</h1><p>从所选平台的关注/订阅页粗筛候选，收集可见的热度、作者、简介与链接；不下载视频。</p></div><div class="metric"><strong id="candidate-count">0</strong><span>当前候选</span></div></section>
+      <section class="panel settings"><div class="section-head"><h2>发现规则</h2><button id="save-settings">保存规则</button></div><fieldset class="platform-picker"><legend>本次粗筛平台</legend><label><input id="platform-all" type="checkbox">全选</label><label><input class="platform" value="douyin" type="checkbox">抖音</label><label><input class="platform" value="xiaohongshu" type="checkbox">小红书</label><label><input class="platform" value="instagram" type="checkbox">Instagram</label><label><input class="platform" value="tiktok" type="checkbox">TikTok</label><label><input class="platform" value="bilibili" type="checkbox">Bilibili</label><label><input class="platform" value="youtube" type="checkbox">YouTube</label></fieldset><label>搜索关键词<textarea id="keywords" placeholder="一行一个关键词"></textarea></label><div class="inline discovery-filters"><label>热榜候选<input id="top-limit" type="number" min="5" max="100"></label><label>最低点赞<input id="min-likes" type="number" min="0" step="100" value="0"></label><label>发布时间<select id="recent-days"><option value="7">最近一周</option><option value="30">最近一个月</option></select></label><label>排序<select id="sort-by"><option value="heat_desc">热度降序</option></select></label><label class="check-filter"><input id="videos-only" type="checkbox">仅视频</label><button class="primary" id="discover-action">开始粗筛（不下载）</button><button id="import-action">同步粗筛 / 下载状态</button></div><p class="quiet">抖音从<a href="https://www.douyin.com/follow" target="_blank" rel="noreferrer">关注页</a>粗筛；TikTok 先使用原生“视频”分类。最近一周和热度降序按结果卡可读取的发布时间、点赞数严格执行。</p></section>
+      <section id="candidates" class="panel"><div class="section-head"><div><p class="eyebrow">FINE FILTER + EDITORIAL CUT</p><h2>候选池与本期编排</h2></div><div class="section-actions"><button id="save-config">保存细筛</button><button class="primary" id="download-action">下载入选抖音视频</button></div></div><p class="quiet">逐支确认候选：勾选入选后填写顺序，1–5 为 TOP，6 为特别加映。当前下载器已接通抖音；其他平台先保留候选链接，待对应下载器接入。</p><div id="candidate-list" class="candidate-list"></div></section>
+      <section id="submit" class="panel submission-panel"><div><p class="eyebrow">SUBMISSIONS</p><h2>手动投稿</h2><p>粘贴链接后先进入候选池。你可以在备注中补充推荐理由、舞种或希望展示的文案。</p></div><form id="submission-form" class="submission-form"><label>投稿链接<input id="manual-url" type="url" placeholder="https://www.douyin.com/video/..." required></label><label>投稿备注<textarea id="manual-note" rows="4" placeholder="推荐理由、舞种、舞名或其他需要人工补充的信息"></textarea></label><button type="submit" id="add-manual">加入候选池</button></form></section>
+      <section id="produce" class="panel produce"><div><p class="eyebrow">RENDER</p><h2>生成成片</h2><p>使用当前已保存的顺序、舞种、作者、难度和本地素材，调用现有渲染器输出竖屏视频。</p></div><button class="primary" id="render-bottom">生成视频</button></section>
+    </div>
+  </main>
+  <template id="candidate-template"><article class="candidate-card"><header class="candidate-card-header"><label class="choose-control"><input class="chosen" type="checkbox"><span>入选本期</span></label><label class="order-control">视频顺序<input class="order" type="number" min="1" max="6" placeholder="-" aria-label="入选顺序"></label><div class="heat"></div><div class="download-cell"></div><a class="source-link" target="_blank" rel="noreferrer">打开原视频</a></header><div class="candidate-fields"><label>舞种<select class="dance-type"><option value="Hip-hop">Hip-hop</option><option value="Urban">Urban</option><option value="Jazz">Jazz</option><option value="K-pop">K-pop</option><option value="水系">水系</option><option value="Popping">Popping</option><option value="Locking">Locking</option></select></label><label>舞名<input class="title" placeholder="填写舞名"></label><label>作者账号<input class="creator" placeholder="@作者"></label><label>难度<select class="stars"><option value="1">1 星</option><option value="2">2 星</option><option value="3">3 星</option><option value="4">4 星</option><option value="5">5 星</option></select></label><label class="narration-field">口播文案<textarea class="narration" rows="5" placeholder="本支舞的口播文案"></textarea></label></div></article></template>
+  <script src="app.js"></script>
+</body>
+</html>

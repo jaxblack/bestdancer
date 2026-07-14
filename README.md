@@ -56,6 +56,28 @@ bestdancer/
 
 🚧 Prompt 与流程已定稿;采集与自动合成脚本待接入。后续计划见 [TODO.md](TODO.md)(含 OpenClaw / Hermes 自动采集路线)。
 
+## 本地管理后台
+
+本地工作台将每周采集、人工策展和成片生成收拢到一个页面，并直接读写
+`config/weekly/<week>.json`：
+
+```bash
+source .venv/bin/activate
+python3 admin/app.py
+```
+
+打开 `http://127.0.0.1:8787` 后，按以下顺序操作：
+
+1. 在顶部勾选发现平台，在“发现规则”按行配置关键词；启动粗筛前，Chrome 需以
+   `--remote-debugging-port=9222` 启动且已登录抖音。
+2. 点击“开始粗筛（不下载）”：后台会从已选平台的当前登录态关注/订阅页收集候选。抖音使用 `https://www.douyin.com/follow` 并收集热度、作者、完整简介和下载状态；小红书、Instagram、TikTok、Bilibili、YouTube 会先保存可见候选链接和卡片文字，进入候选池后人工细筛。
+3. 点击“同步粗筛 / 下载状态”，然后在候选表中人工校正舞种、名称、作者、星级和口播文案；舞种可选 `Hip-hop`、`Urban`、`Jazz`、`K-pop`、`水系`、`Popping`、`Locking`。勾选 5 支 TOP 与最多 1 支特别加映，在同一表格填写 `1–6` 决定视频顺序，保存细筛。
+4. 点击“下载入选抖音视频”后，后台只下载已保存的入选抖音视频；其他平台候选链接继续保留，待对应下载器接入。再次同步状态即可关联本地素材路径。
+5. 投稿链接可先加入候选池，待人工审核、抓取和补充信息后再入选。
+6. 点击“生成视频”调用 `pipeline/render_demo.py <week>`；任务输出会显示在左侧状态区。
+
+后台配置保存在 `admin/settings.json`：关键词是一行一项的列表，平台勾选状态一并保存，可直接复制该文件迁移到另一台机器。每期的人选、顺序和文案保存在 `config/weekly/<week>.json`。两类配置都不会保存或提交抖音 Cookie；Cookie 仍仅保留在每周素材目录中并受 `.gitignore` 保护。
+
 ## License
 
 待定。

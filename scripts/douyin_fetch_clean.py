@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
-"""One-shot: search Douyin for COMPLETE adult choreography, capture full
-aweme_detail metadata, filter out teaching/breakdown/roadshow/kids/battle,
-download the good ones with rich meta saved alongside.
+"""Discover or download Douyin choreography candidates from the following tab.
 
 Output:
   dl2/<vid>.mp4          video
   dl2/<vid>.json         {author, desc, duration, tags, stats, dance_type}
   candidates.json        filtered, ranked list ready for config rebuild
 """
+import argparse
 import json, re, time, subprocess, sys
 sys.stdout.reconfigure(line_buffering=True)
 from pathlib import Path
-from playwright.sync_api import sync_playwright
 
-BASE = Path("/Users/jax/bestdancer/assets/incoming/2026-W29")
+parser = argparse.ArgumentParser(description="Discover or download Douyin choreography candidates")
+parser.add_argument("--week", default="2026-W29", help="Target ISO week, e.g. 2026-W30")
+parser.add_argument("--keywords", default="urban dance 编舞|编舞 完整|kpop dance cover",
+                    help="Pipe-separated search keywords")
+parser.add_argument("--mode", choices=("discover", "download"), default="discover")
+parser.add_argument("--top", type=int, default=30, help="Number of ranked candidates to retain")
+parser.add_argument("--ids", default="", help="Pipe-separated Douyin video IDs selected for download")
+args = parser.parse_args()
+
+BASE = Path(__file__).resolve().parents[1] / "assets" / "incoming" / args.week
 DL = BASE / "dl2"
 DL.mkdir(parents=True, exist_ok=True)
 COOKIES = BASE / "cookies.txt"
@@ -21,7 +28,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36")
 
 # 面向"完整成人编舞"的关键词（避开少儿/教学向词）
-KEYWORDS = ["urban dance 编舞", "编舞 完整", "kpop dance cover"]
+KEYWORDS = [keyword.strip() for keyword in args.keywords.split("|") if keyword.strip()]
 
 # 排除：教学/分解/路演/萌娃/比赛/vlog 等非完整成人舞段
 EXCLUDE = ["教学", "分解", "教程", "tutorial", "零基础", "入门", "基本功", "基础",
@@ -83,10 +90,59 @@ def parse_detail(data):
         "play_url": play,
     }
 
-# ---- collect candidate video IDs across keywords ----
+# ---- download manually selected candidates only ----
+def download_selected() -> int:
+    ranked_path = BASE / "ranked_candidates.json"
+    if not ranked_path.exists():
+        print("[!] 先运行粗筛，生成 ranked_candidates.json")
+        return 1
+    wanted = {video_id for video_id in args.ids.split("|") if video_id}
+    if not wanted:
+        print("[!] 没有收到细筛后的入选视频")
+        return 1
+    ranked = json.loads(ranked_path.read_text(encoding="utf-8"))
+    downloaded = []
+    for item in ranked:
+        video_id = str(item.get("id", ""))
+        if video_id not in wanted:
+            continue
+        out = DL / f"{video_id}.mp4"
+        play = item.get("play_url") or ""
+        if play.startswith("//"):
+            play = "https:" + play
+        if not play:
+            print(f"[skip] {video_id} 没有可下载地址")
+            continue
+        cmd = ["curl", "-sSL", "--max-time", "120", "-A", UA,
+               "-e", f"https://www.douyin.com/video/{video_id}", "-b", str(COOKIES), "-o", str(out), play]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        size = out.stat().st_size if out.exists() else 0
+        if result.returncode == 0 and size > 300_000:
+            item["download_status"] = "downloaded"
+            item["local_file"] = out.name
+            (DL / f"{video_id}.json").write_text(json.dumps(item, ensure_ascii=False, indent=2), encoding="utf-8")
+            downloaded.append(item)
+            print(f"[ok] {video_id} {size // 1024}KB")
+        else:
+            item["download_status"] = "failed"
+            if out.exists():
+                out.unlink()
+            print(f"[fail] {video_id} rc={result.returncode} size={size}")
+    ranked_path.write_text(json.dumps(ranked, ensure_ascii=False, indent=2), encoding="utf-8")
+    (BASE / "downloaded_candidates.json").write_text(json.dumps(downloaded, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"DONE: {len(downloaded)}/{len(wanted)} selected videos downloaded")
+    return 0
+
+
+if args.mode == "download":
+    raise SystemExit(download_selected())
+
+
+from playwright.sync_api import sync_playwright
+
+# ---- collect candidate video IDs from followed accounts ----
 all_ids = []
 seen = set()
-details = {}  # vid -> parsed detail
 
 with sync_playwright() as p:
     browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
@@ -109,31 +165,24 @@ with sync_playwright() as p:
             captured[d["id"]] = d
     page.on("response", on_resp)
 
-    for kw in KEYWORDS:
-        url = f"https://www.douyin.com/search/{kw}?publish_time=30&sort_type=2&type=video"
-        print(f"\n=== search: {kw} ===")
-        try:
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        except Exception as e:
-            print("  goto err", e)
-            continue
-        time.sleep(5)
-        for _ in range(6):
-            page.mouse.wheel(0, 3000)
-            time.sleep(1.2)
-        html = page.content()
-        cnt = 0
-        for m in re.finditer(r'/video/(\d{15,25})', html):
-            vid = m.group(1)
-            if vid not in seen:
-                seen.add(vid)
-                all_ids.append(vid)
-                cnt += 1
-        print(f"  +{cnt} new ids (total {len(all_ids)})")
+    follow_url = "https://www.douyin.com/follow"
+    print("\n=== scanning Douyin following tab ===")
+    page.goto(follow_url, wait_until="domcontentloaded", timeout=60000)
+    time.sleep(5)
+    for _ in range(10):
+        page.mouse.wheel(0, 3000)
+        time.sleep(1.0)
+    for match in re.finditer(r"/video/(\d{15,25})", page.content()):
+        video_id = match.group(1)
+        if video_id not in seen:
+            seen.add(video_id)
+            all_ids.append(video_id)
+    print(f"  found {len(all_ids)} unique videos from followed accounts")
 
-    print(f"\n=== visiting {min(len(all_ids), 40)} video pages to grab metadata ===", flush=True)
+    visit_count = min(len(all_ids), max(args.top * 3, 40))
+    print(f"\n=== visiting {visit_count} video pages to grab metadata ===", flush=True)
     good = []
-    for i, vid in enumerate(all_ids[:40], 1):
+    for i, vid in enumerate(all_ids[:visit_count], 1):
         vurl = f"https://www.douyin.com/video/{vid}"
         try:
             # navigate + concurrently wait for aweme/detail response
@@ -157,41 +206,20 @@ with sync_playwright() as p:
         full_text = d["desc"] + " " + " ".join(d["tags"])
         excl = should_exclude(full_text)
         dur = d["duration_sec"]
-        ok = (not excl) and (15 <= dur <= 100) and d.get("play_url")
+        keyword_ok = not KEYWORDS or any(keyword.lower() in full_text.lower() for keyword in KEYWORDS)
+        ok = (not excl) and keyword_ok and (15 <= dur <= 100)
         flag = "KEEP" if ok else "drop"
         print(f"[{i:02d}] {vid} {dur}s ❤{d['like']} {flag} | {d['author']} | {d['desc'][:40]}", flush=True)
         if ok:
+            d["dance_type"] = dance_type(full_text)
+            d["download_status"] = "ready" if d.get("play_url") else "unavailable"
             good.append(d)
 
     # rank by likes, take best, download
     good.sort(key=lambda x: x["like"], reverse=True)
-    print(f"\n=== {len(good)} candidates pass filter; downloading top 8 ===")
-    downloaded = []
-    for d in good[:8]:
-        vid = d["id"]
-        out = DL / f"{vid}.mp4"
-        play = d["play_url"]
-        if play.startswith("//"):
-            play = "https:" + play
-        cmd = ["curl", "-sSL", "--max-time", "120", "-A", UA,
-               "-e", f"https://www.douyin.com/video/{vid}",
-               "-b", str(COOKIES), "-o", str(out), play]
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        size = out.stat().st_size if out.exists() else 0
-        ok = r.returncode == 0 and size > 300_000
-        if ok:
-            d["dance_type"] = dance_type(d["desc"] + " " + " ".join(d["tags"]))
-            d["local_file"] = out.name
-            (DL / f"{vid}.json").write_text(json.dumps(d, ensure_ascii=False, indent=2))
-            downloaded.append(d)
-            print(f"  OK {vid} {size//1024}KB [{d['dance_type']}] {d['author']}")
-        else:
-            if out.exists(): out.unlink()
-            print(f"  FAIL {vid} rc={r.returncode} size={size}")
-
+    (BASE / "ranked_candidates.json").write_text(
+        json.dumps(good[:args.top], ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     page.close()
 
-(BASE / "candidates.json").write_text(json.dumps(downloaded, ensure_ascii=False, indent=2))
-print(f"\n=== DONE: {len(downloaded)} clean videos downloaded ===")
-for d in downloaded:
-    print(f"  {d['dance_type']:>20} | {d['author']} | {d['duration_sec']}s | ❤{d['like']}")
+print(f"\n=== DONE: {min(len(good), args.top)} candidates ready for manual fine filtering ===")

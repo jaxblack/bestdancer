@@ -158,8 +158,9 @@ def build_segments(cfg: dict) -> list[dict]:
         fit = diff.get("fit", "")
         moves = osd.get("core_moves", [])
         move0 = moves[0] if moves else "核心动作"
-        full_vo = f"第{rank}名，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。" if top \
-                  else f"特别加映，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。"
+        default_vo = f"第{rank}名，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。" if top \
+                 else f"特别加映，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。"
+        full_vo = first_sentences(sanitize_tts(item.get("vo", "")), 2) or default_vo
         if top:
             cap = f"{fit} · 重点练{move0}"
         else:

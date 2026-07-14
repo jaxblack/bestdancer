@@ -19,6 +19,7 @@
       "song": "",
       "duration_sec": 25.5,
       "like": 1709,
+      "play": 0,
       "tags": [
         "hasumi编舞",
         "urban编舞",
@@ -27,8 +28,12 @@
         "抖音潮流舞蹈地图"
       ],
       "url": "https://www.douyin.com/video/7603011422755083249",
-      "dance_type": "Urban Dance",
-      "local_path": "assets/incoming/2026-W29/c1__douyin__7603011422755083249.mp4"
+      "dance_type": "Urban",
+      "local_path": "assets/incoming/2026-W29/c1__douyin__7603011422755083249.mp4",
+      "manual_note": "",
+      "narration": "",
+      "source_desc": "",
+      "download_status": "unknown"
     },
     {
       "id": "c2",
@@ -38,6 +43,7 @@
       "song": "",
       "duration_sec": 28.9,
       "like": 692,
+      "play": 0,
       "tags": [
         "原创编舞",
         "春娇与志明",
@@ -45,8 +51,12 @@
         "抒情urban"
       ],
       "url": "https://www.douyin.com/video/7553646178404683059",
-      "dance_type": "Urban Dance",
-      "local_path": "assets/incoming/2026-W29/c2__douyin__7553646178404683059.mp4"
+      "dance_type": "Urban",
+      "local_path": "assets/incoming/2026-W29/c2__douyin__7553646178404683059.mp4",
+      "manual_note": "",
+      "narration": "",
+      "source_desc": "",
+      "download_status": "unknown"
     },
     {
       "id": "c3",
@@ -56,6 +66,7 @@
       "song": "",
       "duration_sec": 19.4,
       "like": 559,
+      "play": 0,
       "tags": [
         "胆小鬼舞蹈挑战",
         "katie编舞",
@@ -64,8 +75,12 @@
         "urbandance"
       ],
       "url": "https://www.douyin.com/video/7620357632369732607",
-      "dance_type": "Urban Dance",
-      "local_path": "assets/incoming/2026-W29/c3__douyin__7620357632369732607.mp4"
+      "dance_type": "Urban",
+      "local_path": "assets/incoming/2026-W29/c3__douyin__7620357632369732607.mp4",
+      "manual_note": "",
+      "narration": "",
+      "source_desc": "",
+      "download_status": "unknown"
     },
     {
       "id": "c4",
@@ -75,14 +90,19 @@
       "song": "",
       "duration_sec": 36.3,
       "like": 6,
+      "play": 0,
       "tags": [
         "urban舞蹈",
         "whale编舞",
         "原创编舞"
       ],
       "url": "https://www.douyin.com/video/7662028618063952756",
-      "dance_type": "Urban Dance",
-      "local_path": "assets/incoming/2026-W29/c4__douyin__7662028618063952756.mp4"
+      "dance_type": "Urban",
+      "local_path": "assets/incoming/2026-W29/c4__douyin__7662028618063952756.mp4",
+      "manual_note": "",
+      "narration": "",
+      "source_desc": "",
+      "download_status": "unknown"
     },
     {
       "id": "c5",
@@ -90,16 +110,21 @@
       "creator": "@呼和浩特WIN DANCE街舞工作室",
       "title": "Urban Dance",
       "song": "",
-      "duration_sec": 30.0,
+      "duration_sec": 30,
       "like": 6,
+      "play": 0,
       "tags": [
         "ocean编舞",
         "urban",
         "girls"
       ],
       "url": "https://www.douyin.com/video/7661956807669059496",
-      "dance_type": "Urban Dance",
-      "local_path": "assets/incoming/2026-W29/c5__douyin__7661956807669059496.mp4"
+      "dance_type": "Urban",
+      "local_path": "assets/incoming/2026-W29/c5__douyin__7661956807669059496.mp4",
+      "manual_note": "",
+      "narration": "",
+      "source_desc": "",
+      "download_status": "unknown"
     }
   ],
   "classics_pool": [
@@ -111,14 +136,19 @@
       "song": "",
       "duration_sec": 32.5,
       "like": 1,
+      "play": 0,
       "tags": [
         "梧州",
         "urban编舞",
         "hiphop"
       ],
       "url": "https://www.douyin.com/video/7661911276201602806",
-      "dance_type": "Urban Dance",
-      "local_path": "assets/incoming/2026-W29/k1__douyin__7661911276201602806.mp4"
+      "dance_type": "Urban",
+      "local_path": "assets/incoming/2026-W29/k1__douyin__7661911276201602806.mp4",
+      "manual_note": "",
+      "narration": "",
+      "source_desc": "",
+      "download_status": "unknown"
     }
   ],
   "picks": [
@@ -129,17 +159,9 @@
       "highlight_hint": "",
       "cut_suggestion": "",
       "difficulty": {
-        "scores": {
-          "tempo": 3,
-          "complexity": 3,
-          "control": 3,
-          "memory": 3,
-          "stamina": 3
-        },
-        "weighted": 3.0,
         "stars": 3.0,
-        "fit": "Urban Dance",
-        "hardest_part": ""
+        "fit": "Urban",
+        "scores": {}
       }
     },
     {
@@ -149,17 +171,9 @@
       "highlight_hint": "",
       "cut_suggestion": "",
       "difficulty": {
-        "scores": {
-          "tempo": 3,
-          "complexity": 3,
-          "control": 3,
-          "memory": 3,
-          "stamina": 3
-        },
-        "weighted": 3.0,
         "stars": 3.0,
-        "fit": "Urban Dance",
-        "hardest_part": ""
+        "fit": "Urban",
+        "scores": {}
       }
     },
     {
@@ -169,17 +183,9 @@
       "highlight_hint": "",
       "cut_suggestion": "",
       "difficulty": {
-        "scores": {
-          "tempo": 3,
-          "complexity": 3,
-          "control": 3,
-          "memory": 3,
-          "stamina": 3
-        },
-        "weighted": 3.0,
         "stars": 3.0,
-        "fit": "Urban Dance",
-        "hardest_part": ""
+        "fit": "Urban",
+        "scores": {}
       }
     },
     {
@@ -189,17 +195,9 @@
       "highlight_hint": "",
       "cut_suggestion": "",
       "difficulty": {
-        "scores": {
-          "tempo": 3,
-          "complexity": 3,
-          "control": 3,
-          "memory": 3,
-          "stamina": 3
-        },
-        "weighted": 3.0,
         "stars": 3.0,
-        "fit": "Urban Dance",
-        "hardest_part": ""
+        "fit": "Urban",
+        "scores": {}
       }
     },
     {
@@ -209,35 +207,19 @@
       "highlight_hint": "",
       "cut_suggestion": "",
       "difficulty": {
-        "scores": {
-          "tempo": 3,
-          "complexity": 3,
-          "control": 3,
-          "memory": 3,
-          "stamina": 3
-        },
-        "weighted": 3.0,
         "stars": 3.0,
-        "fit": "Urban Dance",
-        "hardest_part": ""
+        "fit": "Urban",
+        "scores": {}
       }
     }
   ],
   "classic_comeback": {
     "id": "k1",
-    "reason": "同期高热完整编舞",
+    "reason": "特别加映",
     "difficulty": {
-      "scores": {
-        "tempo": 3,
-        "complexity": 3,
-        "control": 3,
-        "memory": 3,
-        "stamina": 3
-      },
-      "weighted": 3.0,
       "stars": 3.0,
-      "fit": "随意练",
-      "hardest_part": "跟节奏"
+      "fit": "基础练习",
+      "scores": {}
     }
   },
   "narration": [
@@ -250,7 +232,7 @@
         "stars": 3.0,
         "tag": "本周No.1",
         "core_moves": [
-          "Urban Dance"
+          "Urban"
         ]
       },
       "beginner_tip": ""
@@ -264,7 +246,7 @@
         "stars": 3.0,
         "tag": "本周No.2",
         "core_moves": [
-          "Urban Dance"
+          "Urban"
         ]
       },
       "beginner_tip": ""
@@ -278,7 +260,7 @@
         "stars": 3.0,
         "tag": "本周No.3",
         "core_moves": [
-          "Urban Dance"
+          "Urban"
         ]
       },
       "beginner_tip": ""
@@ -292,7 +274,7 @@
         "stars": 3.0,
         "tag": "本周No.4",
         "core_moves": [
-          "Urban Dance"
+          "Urban"
         ]
       },
       "beginner_tip": ""
@@ -306,7 +288,7 @@
         "stars": 3.0,
         "tag": "本周No.5",
         "core_moves": [
-          "Urban Dance"
+          "Urban"
         ]
       },
       "beginner_tip": ""
@@ -320,7 +302,7 @@
         "stars": 3.0,
         "tag": "特别加映",
         "core_moves": [
-          "Urban Dance"
+          "Urban"
         ]
       },
       "beginner_tip": ""
