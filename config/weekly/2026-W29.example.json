@@ -1,0 +1,101 @@
+{
+  "_readme": "示例数据（全部为虚构占位：创作者、歌曲、播放数据均非真实）。真实流程：跑 prompt 06 生成候选清单 -> 人工下载到 assets/incoming/<week>/（命名 <id>__<source>__<slug>.mp4）-> python pipeline/intake.py <week> 回填 this_week_candidates（含 local_path/duration_sec）-> 再跑 prompts 01→02→03→04 填充 picks/classic_comeback/narration/metadata。",
+  "episode": {
+    "week": "2026-W29",
+    "theme": "夏日高能女团舞特辑",
+    "platforms": ["douyin", "xiaohongshu"],
+    "voice": "young_female",
+    "top_n": 5,
+    "classic_n": 1
+  },
+  "this_week_candidates": [
+    { "id": "c1", "source": "韩舞", "creator": "@dance_mina_示例", "title": "Spark 示例编舞", "song": "《Spark》(示例)", "duration_sec": 42, "play": 1200000, "like": 210000, "share": 34000, "tags": ["女团", "副歌卡点"], "url": "https://example.com/c1", "move_notes": "副歌甩胯 + 波浪，间奏有一次地板撑" },
+    { "id": "c2", "source": "抖音", "creator": "@xiaoyu_dance_示例", "title": "手势卡点舞 示例", "song": "《Neon Night》(示例)", "duration_sec": 28, "play": 2600000, "like": 480000, "share": 90000, "tags": ["手势舞", "新手友好"], "url": "https://example.com/c2", "move_notes": "以手势和上半身卡点为主，几乎不移动脚步，高重复" },
+    { "id": "c3", "source": "韩舞", "creator": "@lena_choreo_示例", "title": "Bad Habit 示例编舞", "song": "《Bad Habit》(示例)", "duration_sec": 55, "play": 880000, "like": 132000, "share": 21000, "tags": ["性感", "isolation"], "url": "https://example.com/c3", "move_notes": "大量胸腔/胯部 isolation，换向多，段落几乎不重复" },
+    { "id": "c4", "source": "抖音", "creator": "@popping_kk_示例", "title": "机械律动 示例", "song": "《Robot》(示例)", "duration_sec": 33, "play": 640000, "like": 98000, "share": 15000, "tags": ["popping", "律动"], "url": "https://example.com/c4", "move_notes": "popping 顿点为主，需要手臂 hit 控制" },
+    { "id": "c5", "source": "韩舞", "creator": "@group_soo_示例", "title": "Summer Pop 示例编舞", "song": "《Summer Pop》(示例)", "duration_sec": 47, "play": 1500000, "like": 240000, "share": 41000, "tags": ["女团", "清爽"], "url": "https://example.com/c5", "move_notes": "中速，队形变化，动作偏大方好记" },
+    { "id": "c6", "source": "抖音", "creator": "@fastfeet_示例", "title": "快脚步挑战 示例", "song": "《Rush》(示例)", "duration_sec": 24, "play": 900000, "like": 150000, "share": 26000, "tags": ["脚步", "高能"], "url": "https://example.com/c6", "move_notes": "高 BPM 连续脚步，体能消耗大" },
+    { "id": "c7", "source": "韩舞", "creator": "@mild_dance_示例", "title": "Slow Love 示例编舞", "song": "《Slow Love》(示例)", "duration_sec": 50, "play": 420000, "like": 61000, "share": 8000, "tags": ["抒情", "柔美"], "url": "https://example.com/c7", "move_notes": "慢歌，动作舒展，重心转换为主" }
+  ],
+  "classics_pool": [
+    { "id": "k1", "source": "韩舞", "creator": "@legacy_group_示例", "title": "经典副歌舞 示例", "song": "《Classic Hit》(示例)", "duration_sec": 45, "tags": ["经典", "基本功"], "url": "https://example.com/k1", "move_notes": "标志性副歌手势 + 波浪，至今大量翻跳与教程" },
+    { "id": "k2", "source": "抖音", "creator": "@oldschool_示例", "title": "初代卡点舞 示例", "song": "《Throwback》(示例)", "duration_sec": 30, "tags": ["经典", "卡点"], "url": "https://example.com/k2", "move_notes": "最早的卡点手势舞之一，动作简单好上手" }
+  ],
+  "picks": [
+    { "rank": 1, "id": "c2", "reason": "全网最火手势卡点，新手也能跟", "highlight_hint": "副歌手势连招", "cut_suggestion": "0:08-0:22", "difficulty": { "scores": { "tempo": 2, "complexity": 2, "control": 1, "memory": 2, "stamina": 1 }, "weighted": 1.7, "stars": 1.5, "fit": "零基础可跟", "hardest_part": "手势换位" } },
+    { "rank": 2, "id": "c5", "reason": "清爽女团舞，动作大方好记", "highlight_hint": "副歌队形变化", "cut_suggestion": "0:12-0:30", "difficulty": { "scores": { "tempo": 3, "complexity": 3, "control": 2, "memory": 3, "stamina": 2 }, "weighted": 2.7, "stars": 2.5, "fit": "有一点基础", "hardest_part": "换队形卡点" } },
+    { "rank": 3, "id": "c1", "reason": "夏日高能，副歌甩胯超上头", "highlight_hint": "副歌 drop 定格", "cut_suggestion": "0:18-0:36", "difficulty": { "scores": { "tempo": 4, "complexity": 3, "control": 3, "memory": 3, "stamina": 3 }, "weighted": 3.3, "stars": 3.5, "fit": "有半年基础更稳", "hardest_part": "甩胯发力" } },
+    { "rank": 4, "id": "c4", "reason": "机械律动，练 hit 控制的好素材", "highlight_hint": "手臂 hit 连段", "cut_suggestion": "0:05-0:20", "difficulty": { "scores": { "tempo": 3, "complexity": 4, "control": 4, "memory": 3, "stamina": 3 }, "weighted": 3.5, "stars": 3.5, "fit": "建议有律动基础", "hardest_part": "顿点干净度" } },
+    { "rank": 5, "id": "c3", "reason": "本周最难，isolation 天花板", "highlight_hint": "胸胯 isolation 连段", "cut_suggestion": "0:20-0:40", "difficulty": { "scores": { "tempo": 4, "complexity": 5, "control": 5, "memory": 4, "stamina": 4 }, "weighted": 4.4, "stars": 4.5, "fit": "进阶挑战", "hardest_part": "胸腔独立发力" } }
+  ],
+  "classic_comeback": {
+    "id": "k1",
+    "reason": "副歌手势是无数编舞的基础，现在学正好打底",
+    "difficulty": { "scores": { "tempo": 2, "complexity": 2, "control": 2, "memory": 2, "stamina": 2 }, "weighted": 2.0, "stars": 2.0, "fit": "零基础友好", "hardest_part": "波浪连贯" }
+  },
+  "narration": [
+    {
+      "segment": "top",
+      "rank": 1,
+      "vo": "本周第一名，@xiaoyu_dance 的《Neon Night》手势卡点舞！全程几乎不用挪脚，重点全在手上。核心就两个：跟着鼓点做手势定格，副歌处手掌快速翻转卡拍。零基础也能跟，先把副歌那组手势练熟就成功一大半啦。",
+      "subtitle": ["本周No.1｜手势卡点舞", "《Neon Night》@xiaoyu_dance", "手势定格 + 手掌翻转卡拍", "零基础也能跟"],
+      "on_screen": { "stars": 1.5, "tag": "本周No.1", "core_moves": ["手势定格", "手掌翻转"] },
+      "beginner_tip": "先对着镜子把副歌四拍手势练慢再加速。"
+    },
+    {
+      "segment": "top",
+      "rank": 2,
+      "vo": "第二名，@group_soo 的《Summer Pop》，清爽又好记的女团舞。动作偏大方，最大看点是副歌的队形变化。要抓两个点：手臂打开的大幅挥摆，还有换位时脚下的踏点要卡在鼓点上。有一点基础就能上，先练手臂、再加脚步。",
+      "subtitle": ["No.2｜清爽女团舞", "《Summer Pop》@group_soo", "大幅挥摆 + 换位踏点", "先练手、再加脚"],
+      "on_screen": { "stars": 2.5, "tag": "No.2", "core_moves": ["大幅挥摆", "换位踏点"] },
+      "beginner_tip": "先分开练手和脚，熟了再合。"
+    },
+    {
+      "segment": "top",
+      "rank": 3,
+      "vo": "第三名，@dance_mina 的《Spark》，今年夏天最上头的高能编舞！副歌一个甩胯配上半身波浪，间奏还有个帅气的地板撑。难点在甩胯的发力，要用腰带动、不是硬扭。建议有半年基础再挑战，可以先单独把波浪练顺。",
+      "subtitle": ["No.3｜夏日高能", "《Spark》@dance_mina", "甩胯 + 波浪 + 地板撑", "用腰发力，不是硬扭"],
+      "on_screen": { "stars": 3.5, "tag": "No.3", "core_moves": ["甩胯", "波浪"] },
+      "beginner_tip": "先练上半身波浪，找到腰发力的感觉。"
+    },
+    {
+      "segment": "top",
+      "rank": 4,
+      "vo": "第四名，@popping_kk 的《Robot》机械律动，练控制力的绝佳素材。全程靠 popping 顿点，手臂每个 hit 都要干脆有力。关键是收放要快、停得住，糊在一起就没那味了。有律动基础的宝子来练，先从单手 hit 一拍一拍抠。",
+      "subtitle": ["No.4｜机械律动", "《Robot》@popping_kk", "popping 顿点 + 手臂 hit", "收放要快、停得住"],
+      "on_screen": { "stars": 3.5, "tag": "No.4", "core_moves": ["popping顿点", "手臂hit"] },
+      "beginner_tip": "先单手对镜子练一拍一停。"
+    },
+    {
+      "segment": "top",
+      "rank": 5,
+      "vo": "压轴是本周最难的一支，@lena_choreo 的《Bad Habit》，isolation 天花板！大量胸腔和胯部的独立律动，换向又多，几乎每个八拍都不重复。最难是胸腔单独发力、别带动肩膀。这支是进阶挑战，新手别慌，先只练胸腔的前后 isolation 找感觉。",
+      "subtitle": ["No.5｜本周最难", "《Bad Habit》@lena_choreo", "胸腔 + 胯部 isolation", "进阶挑战·新手别慌"],
+      "on_screen": { "stars": 4.5, "tag": "本周最难", "core_moves": ["胸腔isolation", "胯部律动"] },
+      "beginner_tip": "对镜子先练胸腔前后推，肩膀保持不动。"
+    },
+    {
+      "segment": "classic",
+      "rank": null,
+      "vo": "经典回归时间！这支《Classic Hit》的副歌舞，到现在还有无数人翻跳、出教程——因为它的手势和波浪是很多编舞的基础，现在学正好打底。动作不快，跟着做标志性副歌手势，再接一个连贯的手臂波浪就行。零基础超友好，练熟它，后面很多舞都能更快上手。",
+      "subtitle": ["经典回归｜基本功打底", "《Classic Hit》@legacy_group", "副歌手势 + 手臂波浪", "零基础友好·必练"],
+      "on_screen": { "stars": 2.0, "tag": "经典回归", "core_moves": ["副歌手势", "手臂波浪"] },
+      "beginner_tip": "把波浪练连贯，从指尖到肩膀一节节推过去。"
+    }
+  ],
+  "metadata": {
+    "douyin": {
+      "titles": ["本周最火5支热舞！第3支甜到跺脚💃", "0基础也能跳！本周热舞TOP5+经典回归", "夏日高能女团舞，第5支难到封神"],
+      "caption": "本周热舞来啦！从0基础手势舞到进阶 isolation，还有一支经典回归帮你打基础～跟着难度星级挑一支开跳吧！\n\n视频素材版权归原作者所有 {credits}",
+      "hashtags": ["#韩舞", "#舞蹈教程", "#新手跳舞", "#本周热舞", "#女团舞", "#卡点舞", "#跳舞日常", "#热舞挑战"],
+      "pinned_comment": "你想先学哪一支？评论区扣编号，点赞高的下期出慢速教学！",
+      "trending_audio_note": "建议用当期热榜原声或可商用卡点 BGM；原曲有版权风险，避免直接搬运整段原声。"
+    },
+    "xiaohongshu": {
+      "note_title": "本周热舞TOP5💃0基础也能跳(附难度)",
+      "body": "📌本周热舞盘点来啦，按难度帮你排好了，照着挑一支开练👇\n\n① 《Neon Night》手势卡点 ⭐1.5｜零基础可跟\n② 《Summer Pop》清爽女团 ⭐2.5｜有点基础\n③ 《Spark》甩胯波浪 ⭐3.5｜半年基础更稳\n④ 《Robot》机械律动 ⭐3.5｜练控制力\n⑤ 《Bad Habit》isolation 天花板 ⭐4.5｜进阶挑战\n\n🎁经典回归：《Classic Hit》副歌舞 ⭐2.0，基本功打底必练！\n\n每支都有动作分解和新手练习建议，收藏慢慢跟～\n\n素材版权归原作者所有 {credits}",
+      "cover_text": { "main": "本周热舞", "sub": "TOP5+经典回归" },
+      "topics": ["#韩舞教程", "#新手舞蹈", "#跳舞日常", "#女团舞", "#卡点舞", "#舞蹈分解", "#零基础学舞"]
+    }
+  }
+}

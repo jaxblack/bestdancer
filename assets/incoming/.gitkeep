@@ -1,0 +1,18 @@
+# 人工上传目录
+
+抖音 / 小红书反爬时，把下载好的候选片段放进本目录的按周子文件夹：
+
+```
+assets/incoming/<week>/<id>__<source>__<slug>.<ext>
+```
+
+- `week`   例：`2026-W29`
+- `id`     `c1..cN` 本周新舞 / `k1..kN` 经典回归候选
+- `source` `kdance`（韩舞）或 `douyin`（抖音）
+- `slug`   英文 / 拼音短标题，用连字符
+
+例：`assets/incoming/2026-W29/c1__kdance__spark.mp4`
+
+放好后运行 `python pipeline/intake.py 2026-W29` 自动并入周配置。
+
+> 视频文件本身被 `.gitignore` 忽略，不会提交到仓库。
