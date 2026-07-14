@@ -21,6 +21,7 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 import wave
@@ -134,10 +135,10 @@ def build_segments(cfg: dict) -> list[dict]:
 
     segs = [{
         "type": "intro", "cid": None,
-        "vo": "本周热舞来啦！五支最火，加一支经典回归，跟着星级挑一支开跳！",
+        "vo": "本周热舞榜，五支正片，加一支特别加映。",
         "title1": "本周热舞", "title2": "WEEKLY DANCE",
         "sub": clean(ep.get("theme", "")), "week": ep.get("week", ""),
-        "foot": "TOP5 + 经典回归",
+        "foot": "TOP5 + 特别加映",
     }]
 
     for item in cfg.get("narration", []):
@@ -157,7 +158,8 @@ def build_segments(cfg: dict) -> list[dict]:
         fit = diff.get("fit", "")
         moves = osd.get("core_moves", [])
         move0 = moves[0] if moves else "核心动作"
-        full_vo = first_sentences(sanitize_tts(item.get("vo", "")), 2) or f"第{rank}名，{tts_title}，{stars:g}星。"
+        full_vo = f"第{rank}名，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。" if top \
+                  else f"特别加映，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。"
         if top:
             cap = f"{fit} · 重点练{move0}"
         else:
@@ -165,12 +167,16 @@ def build_segments(cfg: dict) -> list[dict]:
         segs.append({
             "type": item.get("segment"), "cid": cid, "rank": rank, "vo": full_vo,
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
-            "title": title, "creator": clean(cand.get("creator", "")),
-            "cap": cap, "tip": item.get("beginner_tip", ""),
+            "title": cand.get("dance_type", "街舞"),
+            "creator": clean(cand.get("creator", "")),
+            "cap": cand.get("dance_type", "街舞") + " · " + clean(cand.get("creator", "")),
+            "tip": "",
+            "subtitles": [cand.get("dance_type", "街舞") + " · " + clean(cand.get("creator", ""))],
+            "vo_caption": full_vo,
         })
 
     segs.append({"type": "outro", "cid": None,
-                 "vo": "你最想学哪一支？评论区告诉我，喜欢就关注追更，谢谢观看，下周同一时间见！",
+                 "vo": "你最喜欢哪一支？评论区见。",
                  "title1": "关注追更", "sub": "下周同一时间见"})
     return segs
 
@@ -261,20 +267,30 @@ def render_overlay(seg) -> Image.Image:
     if seg["creator"]:
         d.text((W / 2, 162), "原创 " + seg["creator"], font=F_SMALL, fill=GRAY, anchor="mm")
     draw_stars(img, d, W / 2, 204, seg["stars"])
+    # 中部 AI 口播大字幕（半透明黑底 + 大白字）
+    vo_cap = seg.get("vo_caption", "")
+    if vo_cap:
+        vo_lines = wrap(d, vo_cap, F_SUB, W - 2 * MARGIN - 40)[:3]
+        line_h = F_SUB.size + 14
+        box_h = line_h * len(vo_lines) + 30
+        box_top = H - 232 - box_h - 24
+        d.rounded_rectangle([MARGIN - 8, box_top, W - MARGIN + 8, box_top + box_h],
+                            radius=18, fill=(0, 0, 0, 190))
+        y = box_top + 15 + line_h / 2
+        for ln in vo_lines:
+            d.text((W / 2, y), ln, font=F_SUB, fill=WHITE, anchor="mm")
+            y += line_h
     # 底部面板（与顶部同高）
     d.rounded_rectangle([-40, H - 232, W + 40, H + 40], radius=26, fill=(8, 8, 16, 168))
     chips_row(d, seg["moves"], H - 216)
-    y = H - 162
-    for ln in wrap(d, seg["cap"], F_SUB, W - 2 * MARGIN)[:2]:
-        d.text((W / 2, y), ln, font=F_SUB, fill=WHITE, anchor="mm")
-        y += 42
-    if seg["tip"]:
-        d.rounded_rectangle([MARGIN, H - 96, W - MARGIN, H - 26], radius=14,
-                            fill=(30, 20, 30, 205))
-        d.rounded_rectangle([MARGIN + 18, H - 80, MARGIN + 30, H - 56], radius=3, fill=ACCENT)
-        d.text((MARGIN + 42, H - 82), "新手先练", font=F_CHIP, fill=ACCENT)
-        for ln in wrap(d, seg["tip"], F_SMALL, W - 2 * MARGIN - 40)[:1]:
-            d.text((MARGIN + 18, H - 52), ln, font=F_SMALL, fill=WHITE)
+    subtitles = seg.get("subtitles") or [seg["cap"]]
+    y = H - 158
+    for i, text in enumerate(subtitles[:3]):
+        font = F_SUB if i == 0 else F_SMALL
+        color = WHITE if i == 0 else CA
+        for ln in wrap(d, text, font, W - 2 * MARGIN - 24)[:1]:
+            d.text((W / 2, y), ln, font=font, fill=color, anchor="mm")
+        y += 40
     return img
 
 
@@ -339,14 +355,21 @@ def wav_dur(p):
         return w.getnframes() / w.getframerate()
 
 
-def concat_wavs(files, out):
+def concat_wavs(files, out, target_durs=None):
+    """按顺序拼接 wav；若给 target_durs，把每段 pad 到目标时长再加 GAP 静音。"""
     params, data = None, bytearray()
-    for f in files:
+    for i, f in enumerate(files):
         with wave.open(str(f), "rb") as w:
             if params is None:
                 params = w.getparams()
-            data += w.readframes(w.getnframes())
-        data += b"\x00" * (int(params.framerate * GAP) * params.sampwidth * params.nchannels)
+            frames = w.getnframes()
+            data += w.readframes(frames)
+        cur_sec = frames / params.framerate
+        pad_sec = 0.0
+        if target_durs is not None and i < len(target_durs):
+            pad_sec = max(0.0, target_durs[i] - cur_sec)
+        pad_frames = int(params.framerate * (pad_sec + GAP))
+        data += b"\x00" * pad_frames * params.sampwidth * params.nchannels
     with wave.open(str(out), "wb") as w:
         w.setparams(params)
         w.writeframes(bytes(data))
@@ -435,6 +458,27 @@ def main() -> int:
     cfg = json.loads(cfg_path.read_text("utf-8"))
     segs = build_segments(cfg)
 
+    # ---- 文案 review 输出（控制台 + 文本文件）----
+    review_lines = ["=" * 60, f"📝 文案 REVIEW ({args.week}) — 共 {len(segs)} 段", "=" * 60]
+    for i, s in enumerate(segs):
+        t = s.get("type", "?")
+        label = f"[{i:02d}][{t}]"
+        if t == "top":
+            label += f" No.{s.get('rank')}"
+        vo = s.get("vo", "")
+        review_lines += [f"\n{label}  ({len(vo)}字)", f"  🎙  {vo}"]
+        subtitles = s.get("subtitles", [])
+        if subtitles:
+            review_lines.append("  💬  " + " / ".join(subtitles))
+        elif s.get("sub"):
+            review_lines.append(f"  💬  {s['sub']}")
+    review_lines.append("=" * 60)
+    review_text = "\n".join(review_lines) + "\n"
+    print("\n" + review_text, flush=True)
+    review_path = REPO / "output" / "research" / f"{args.week}_copy_review.txt"
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    review_path.write_text(review_text, "utf-8")
+
     tts_dir = REPO / "output" / "tts" / args.week
     tts_dir.mkdir(parents=True, exist_ok=True)
     tmp_dir = REPO / "output" / "tmp" / args.week
@@ -462,11 +506,14 @@ def main() -> int:
             except Exception as e2:  # noqa: BLE001
                 print(f"[warn] SAPI 也失败({e2})，出无声样片")
 
-    default_dur = {"intro": 3.0, "top": 4.5, "classic": 4.5, "outro": 3.0}
+    default_dur = {"intro": 5.0, "top": 11.0, "classic": 11.0, "outro": 6.0}
+    min_dur = {"intro": 4.0, "top": 10.0, "classic": 10.0, "outro": 6.0}
     timeline, t0, wavs = [], 0.0, []
     for i, s in enumerate(segs):
         wp = tts_dir / f"{i:02d}.wav"
         dur = wav_dur(wp) if audio_ok else default_dur.get(s["type"], 4.0)
+        # 保底最短时长：AI 说完还得留时间让观众看清舞和字幕
+        dur = max(dur, min_dur.get(s["type"], 3.0))
         if audio_ok:
             wavs.append(wp)
         timeline.append({"seg": s, "start": t0, "adur": dur})
@@ -475,7 +522,8 @@ def main() -> int:
     total_v = total
 
     if audio_ok:
-        concat_wavs(wavs, tts_dir / "voice.wav")
+        concat_wavs(wavs, tts_dir / "voice.wav",
+                    target_durs=[e["adur"] for e in timeline])
 
     # 背景：有真片就归一化成竖屏，没有则占位
     for i, e in enumerate(timeline):
@@ -543,9 +591,13 @@ def main() -> int:
         subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(silent),
                         "-i", str(tts_dir / "voice.wav"), "-i", str(bed_path),
                         "-filter_complex",
-                        "[1:a]aformat=sample_rates=44100:channel_layouts=stereo,volume=1.2[vo];"
-                        "[2:a]volume=1.0[bg];"
-                        "[vo][bg]amix=inputs=2:duration=longest:normalize=0[a]",
+                        "[1:a]aformat=sample_rates=44100:channel_layouts=stereo,"
+                        "volume=1.55,asplit=2[vo][sc];"
+                        "[2:a]aformat=sample_rates=44100:channel_layouts=stereo,volume=0.32[bg];"
+                        "[bg][sc]sidechaincompress=threshold=0.008:ratio=15:"
+                        "attack=10:release=350[ducked];"
+                        "[vo][ducked]amix=inputs=2:duration=longest:normalize=0,"
+                        "alimiter=limit=0.95[a]",
                         "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac",
                         "-b:a", "192k", "-shortest", str(final)], check=True)
     else:
@@ -554,8 +606,18 @@ def main() -> int:
                         "-c:a", "aac", "-b:a", "192k", "-shortest", str(final)], check=True)
     silent.unlink(missing_ok=True)
 
+    # OpenClaw 只允许从 workspace 等安全目录发送附件；自动导出一份可点击版本。
+    export_dir = Path.home() / ".openclaw" / "workspace" / "exports" / "bestdancer"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    exported_video = export_dir / final.name
+    shutil.copy2(final, exported_video)
+    review_path = REPO / "output" / "research" / f"{args.week}_copy_review.txt"
+    if review_path.exists():
+        shutil.copy2(review_path, export_dir / review_path.name)
+
     print(f"OK -> {final.relative_to(REPO).as_posix()}  ({total_v:.1f}s, 语音={engine}, "
           f"真片背景={n_real}/{len(timeline)}, 真片BGM={real_n}/{len(timeline)})")
+    print(f"ATTACH -> {exported_video}")
     if total_v > 100:
         print(f"[note] 时长 {total_v:.1f}s 偏长，可把 first_sentences 改 2 句。")
     return 0

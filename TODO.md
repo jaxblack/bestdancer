@@ -1,7 +1,14 @@
 # TODO / 路线图 · 本周热舞
 
-> 现状：prompt 流程（00–06）、难度 rubric、`pipeline/intake.py`、品牌配色、一期完整示例（[config/weekly/2026-W29.example.json](config/weekly/2026-W29.example.json)，含生成好的解说 + 抖音/小红书物料）已就绪。
+> 现状：2026-W29 已跑通 —— 抖音真素材抓取(CDP+Playwright)、完整成人编舞过滤、音画同步渲染、真实作者署名、字幕+片尾。详见 [docs/skills/douyin-weekly-pipeline.md](docs/skills/douyin-weekly-pipeline.md) 和 [docs/skills/QUICKSTART.md](docs/skills/QUICKSTART.md)。
 > 下面是后续优化项，按优先级大致排列，慢慢迭代。
+
+## 🔥 用户明确要的下轮改进（2026-W29 反馈）
+
+- [ ] **字幕淡出** —— 不全程常驻，说完/一定时间后消失（render_demo.py 里给 `vo_caption` 加淡入淡出遮罩，参考现有 fade 逻辑）
+- [ ] **显示舞蹈/曲名** —— 从 `aweme_detail.desc` 或 `aweme_detail.music.title` 提取，加到字幕
+- [ ] **难度配置后台** —— 现在星级写死 3.0，需要一个 UI/CLI 让人手动调每段舞的 star/tempo/complexity 等
+- [ ] **改用博主主页 + 筛选框直取** —— 未来用户会给：① 关键词列表 ② 关注博主列表；抛弃逐个视频页翻看的低效方式
 
 ## 🎯 正在酝酿：自动化采集（OpenClaw / Hermes）
 

@@ -52,6 +52,7 @@ pnpm-debug.log*
 .env.*
 !.env.example
 *.key
+cookies.txt
 secrets.json
 
 # === 编辑器 / 系统 ===
