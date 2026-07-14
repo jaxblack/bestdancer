@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "intent": {
+    "keywords": ["urban", "kpop", "jazz", "hiphop", "编舞"],
+    "content_type": "video",
+    "published_within_days": 7,
+    "ranking": "platform_native_then_editorial"
+  },
+  "adapters": {
+    "douyin": {
+      "name": "抖音",
+      "entry": "https://www.douyin.com/follow",
+      "search_entry": "https://www.douyin.com/search/{keyword}?type=video",
+      "mode": "following_feed",
+      "native_actions": ["搜索结果分类: 视频", "筛选", "排序依据: 最多点赞", "发布时间: 一周内"],
+      "native_filters": {
+        "sort": {
+          "label": "排序依据",
+          "options": ["综合排序", "最新发布", "最多点赞"],
+          "default_for_weekly_discovery": "最多点赞"
+        },
+        "published_at": {
+          "label": "发布时间",
+          "options": ["不限", "一天内", "一周内", "半年内"],
+          "default_for_weekly_discovery": "一周内"
+        },
+        "duration": {
+          "label": "视频时长",
+          "options": ["不限", "1分钟以下", "1-5分钟", "5分钟以上"],
+          "default_for_weekly_discovery": "不限"
+        },
+        "scope": {
+          "label": "搜索范围",
+          "options": ["不限", "关注的人", "最近看过", "还未看过"],
+          "default_for_weekly_discovery": "不限"
+        }
+      },
+      "candidate_url_pattern": "/video/<id>",
+      "available_fields": ["author", "description", "likes", "duration", "tags", "publish_time"],
+      "status": "verified_native_filter_options"
+    },
+    "xiaohongshu": {
+      "name": "小红书",
+      "entry": "https://www.xiaohongshu.com/search_result/?keyword={keyword}&type=51",
+      "mode": "keyword_search",
+      "native_actions": ["打开筛选", "排序依据: 最新", "笔记类型: 视频", "发布时间: 一周内", "收起筛选"],
+      "candidate_url_pattern": "/explore/<note_id>",
+      "available_fields": ["title", "author", "likes", "publish_time", "note_url"],
+      "status": "verified_with_active_browser_tab"
+    },
+    "instagram": {
+      "name": "Instagram",
+      "entry": "https://www.instagram.com/explore/search/keyword/?q={keyword}",
+      "mode": "keyword_search",
+      "native_actions": [],
+      "candidate_url_pattern": "/p/<shortcode> or /reel/<shortcode>",
+      "available_fields": ["caption", "author", "likes", "published_at"],
+      "status": "verified_no_native_search_time_or_heat_filter"
+    },
+    "tiktok": {
+      "name": "TikTok",
+      "entry": "https://www.tiktok.com/search?q={keyword}",
+      "mode": "keyword_search",
+      "native_actions": ["结果分类: 视频"],
+      "candidate_url_pattern": "/@<creator>/video/<id>",
+      "available_fields": ["caption", "author", "likes", "publish_date", "video_url"],
+      "status": "verified"
+    },
+    "bilibili": {
+      "name": "Bilibili",
+      "entry": "https://search.bilibili.com/all?keyword={keyword}",
+      "mode": "keyword_search",
+      "native_actions": ["排序: 最新发布", "更多筛选", "日期: 最近一周"],
+      "candidate_url_pattern": "/video/BV<id>",
+      "available_fields": ["title", "author", "plays", "danmaku", "duration", "publish_date", "video_url"],
+      "status": "verified"
+    },
+    "youtube": {
+      "name": "YouTube",
+      "entry": "https://www.youtube.com/results?search_query={keyword}",
+      "mode": "keyword_search",
+      "native_actions": ["过滤", "上传日期: 本周", "类型: 长视频", "优先顺序: 热门程度"],
+      "candidate_url_pattern": "/watch?v=<id>",
+      "available_fields": ["title", "channel", "views", "published_at", "duration", "video_url"],
+      "status": "verified_filter_combination_needs_per_session_check"
+    }
+  }
+}

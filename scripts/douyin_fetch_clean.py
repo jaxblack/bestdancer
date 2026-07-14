@@ -10,17 +10,21 @@ import argparse
 import json, re, time, subprocess, sys
 sys.stdout.reconfigure(line_buffering=True)
 from pathlib import Path
+from urllib.parse import quote
 
 parser = argparse.ArgumentParser(description="Discover or download Douyin choreography candidates")
 parser.add_argument("--week", default="2026-W29", help="Target ISO week, e.g. 2026-W30")
 parser.add_argument("--keywords", default="urban dance 编舞|编舞 完整|kpop dance cover",
                     help="Pipe-separated search keywords")
 parser.add_argument("--mode", choices=("discover", "download"), default="discover")
+parser.add_argument("--source", choices=("follow", "search"), default="follow",
+                    help="Discover from the followed feed or keyword search")
 parser.add_argument("--top", type=int, default=30, help="Number of ranked candidates to retain")
 parser.add_argument("--ids", default="", help="Pipe-separated Douyin video IDs selected for download")
 args = parser.parse_args()
 
-BASE = Path(__file__).resolve().parents[1] / "assets" / "incoming" / args.week
+REPO = Path(__file__).resolve().parents[1]
+BASE = REPO / "assets" / "incoming" / args.week
 DL = BASE / "dl2"
 DL.mkdir(parents=True, exist_ok=True)
 COOKIES = BASE / "cookies.txt"
@@ -29,6 +33,9 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 
 # 面向"完整成人编舞"的关键词（避开少儿/教学向词）
 KEYWORDS = [keyword.strip() for keyword in args.keywords.split("|") if keyword.strip()]
+
+ADAPTERS = json.loads((REPO / "config" / "platform_adapters.json").read_text(encoding="utf-8"))
+DOUYIN_ADAPTER = ADAPTERS["adapters"]["douyin"]
 
 # 排除：教学/分解/路演/萌娃/比赛/vlog 等非完整成人舞段
 EXCLUDE = ["教学", "分解", "教程", "tutorial", "零基础", "入门", "基本功", "基础",
@@ -60,6 +67,45 @@ def dance_type(text):
 def should_exclude(text):
     t = text.lower()
     return any(kw.lower() in t for kw in EXCLUDE)
+
+
+def collect_search_ids(page):
+    """Use the verified native Douyin search controls and return visible video IDs."""
+    filters = DOUYIN_ADAPTER["native_filters"]
+    sort = filters["sort"]["default_for_weekly_discovery"]
+    published_at = filters["published_at"]["default_for_weekly_discovery"]
+    all_ids = []
+    seen = set()
+
+    for keyword in KEYWORDS:
+        search_url = DOUYIN_ADAPTER["search_entry"].format(keyword=quote(keyword))
+        print(f"\n=== searching Douyin: {keyword} ===", flush=True)
+        page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
+        time.sleep(3)
+        body_text = page.locator("body").inner_text()
+        if "登录后即可搜索更多精彩视频" in body_text:
+            raise RuntimeError("抖音搜索筛选需要先在 Chrome 中登录")
+        video_tab = page.get_by_text("视频", exact=True)
+        if video_tab.count():
+            video_tab.first.click()
+            time.sleep(1)
+        filter_button = page.get_by_text("筛选", exact=True)
+        if not filter_button.count():
+            raise RuntimeError("抖音搜索页未找到原生筛选入口")
+        filter_button.first.click()
+        time.sleep(0.4)
+        for label in (sort, published_at):
+            option = page.get_by_text(label, exact=True)
+            if not option.count():
+                raise RuntimeError(f"抖音筛选面板未找到选项: {label}")
+            option.last.click()
+            time.sleep(0.8)
+        for match in re.finditer(r"/video/(\d{15,25})", page.content()):
+            video_id = match.group(1)
+            if video_id not in seen:
+                seen.add(video_id)
+                all_ids.append(video_id)
+    return all_ids
 
 def parse_detail(data):
     aw = data.get("aweme_detail") or (data.get("item_list") or [{}])[0]
@@ -165,19 +211,23 @@ with sync_playwright() as p:
             captured[d["id"]] = d
     page.on("response", on_resp)
 
-    follow_url = "https://www.douyin.com/follow"
-    print("\n=== scanning Douyin following tab ===")
-    page.goto(follow_url, wait_until="domcontentloaded", timeout=60000)
-    time.sleep(5)
-    for _ in range(10):
-        page.mouse.wheel(0, 3000)
-        time.sleep(1.0)
-    for match in re.finditer(r"/video/(\d{15,25})", page.content()):
-        video_id = match.group(1)
-        if video_id not in seen:
-            seen.add(video_id)
-            all_ids.append(video_id)
-    print(f"  found {len(all_ids)} unique videos from followed accounts")
+    if args.source == "search":
+        all_ids = collect_search_ids(page)
+        print(f"  found {len(all_ids)} unique videos from keyword search")
+    else:
+        follow_url = "https://www.douyin.com/follow"
+        print("\n=== scanning Douyin following tab ===")
+        page.goto(follow_url, wait_until="domcontentloaded", timeout=60000)
+        time.sleep(5)
+        for _ in range(10):
+            page.mouse.wheel(0, 3000)
+            time.sleep(1.0)
+        for match in re.finditer(r"/video/(\d{15,25})", page.content()):
+            video_id = match.group(1)
+            if video_id not in seen:
+                seen.add(video_id)
+                all_ids.append(video_id)
+        print(f"  found {len(all_ids)} unique videos from followed accounts")
 
     visit_count = min(len(all_ids), max(args.top * 3, 40))
     print(f"\n=== visiting {visit_count} video pages to grab metadata ===", flush=True)
