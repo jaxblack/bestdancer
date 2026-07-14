@@ -181,6 +181,27 @@
 .candidate-fields .narration-field { grid-column: 1 / -1; }
 .candidate-fields textarea { min-height: 112px; line-height: 1.55; resize: vertical; }
 
+.clip-controls,
+.voice-controls {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid #dcd8ca;
+  background: #f7f4ec;
+}
+
+.clip-controls label,
+.voice-controls label { min-width: 155px; }
+.clip-controls button,
+.voice-controls button { min-height: 38px; }
+.clip-status,
+.voice-status { min-width: 88px; padding: 9px 0; color: #5f605c; font-size: 12px; }
+.clip-player { width: min(100%, 360px); max-height: 320px; background: #11131a; }
+.voice-player { width: min(100%, 280px); height: 38px; }
+
 .submission-panel {
   display: grid;
   grid-template-columns: minmax(260px, 0.7fr) minmax(360px, 1fr);
@@ -197,6 +218,18 @@
 
 .submission-form textarea { min-height: 110px; line-height: 1.55; resize: vertical; }
 .submission-form button { justify-self: start; }
+
+.produce { align-items: start; }
+.produce-copy { width: min(100%, 780px); }
+.video-description {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #dcd8ca;
+}
+
+.video-description h3 { margin: 0; font-size: 16px; }
+.video-description p { margin: 5px 0 0; color: #73746e; font-size: 12px; }
+.video-description textarea { width: 100%; min-height: 240px; margin-top: 12px; line-height: 1.55; resize: vertical; }
 
 @media (max-width: 1000px) {
   header { height: auto; }
@@ -223,5 +256,11 @@
   .candidate-card-header { align-items: flex-start; flex-wrap: wrap; gap: 10px 14px; }
   .candidate-card .heat { margin-left: 0; }
   .candidate-fields { grid-template-columns: 1fr; }
+  .clip-controls,
+  .voice-controls { align-items: stretch; }
+  .clip-controls label,
+  .voice-controls label { min-width: 0; flex: 1 1 140px; }
+  .clip-player,
+  .voice-player { width: 100%; }
   .submission-panel { grid-template-columns: 1fr; gap: 20px; }
 }

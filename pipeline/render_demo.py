@@ -167,6 +167,9 @@ def build_segments(cfg: dict) -> list[dict]:
             cap = f"{fit} · 基本功打底必练"
         segs.append({
             "type": item.get("segment"), "cid": cid, "rank": rank, "vo": full_vo,
+            "voice": item.get("voice", VOICE), "voice_rate": item.get("voice_rate", RATE),
+            "clip_start_sec": float(cand.get("clip_start_sec") or 0),
+            "clip_end_sec": float(cand.get("clip_end_sec") or 0),
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
             "title": cand.get("dance_type", "街舞"),
             "creator": clean(cand.get("creator", "")),
@@ -413,9 +416,9 @@ def concat_bed(slices, out):
         w.writeframes(b"".join(chunks))
 
 
-def edge_tts_synth(text, out_wav, ff):
+def edge_tts_synth(text, out_wav, ff, voice=VOICE, rate=RATE):
     mp3 = out_wav.with_suffix(".mp3")
-    asyncio.run(__import__("edge_tts").Communicate(text, VOICE, rate=RATE).save(str(mp3)))
+    asyncio.run(__import__("edge_tts").Communicate(text, voice, rate=rate).save(str(mp3)))
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(mp3),
                     "-ar", "44100", "-ac", "1", str(out_wav)], check=True)
     mp3.unlink(missing_ok=True)
@@ -433,9 +436,9 @@ def find_clip(week, cid):
     return None
 
 
-def normalize_clip(src, dst, dur, ff):
+def normalize_clip(src, dst, dur, ff, start=0.0):
     # 保留原音轨（若有），供“真片自带 BGM”使用
-    subprocess.run([ff, "-y", "-loglevel", "error", "-stream_loop", "-1",
+    subprocess.run([ff, "-y", "-loglevel", "error", "-ss", f"{start:.3f}", "-stream_loop", "-1",
                     "-t", f"{dur:.3f}", "-i", str(src), "-vf",
                     f"scale={W}:{H}:force_original_aspect_ratio=increase,"
                     f"crop={W}:{H},fps={FPS}", "-pix_fmt", "yuv420p", str(dst)],
@@ -490,7 +493,7 @@ def main() -> int:
     if not args.no_audio:
         try:
             for i, s in enumerate(segs):
-                edge_tts_synth(s["vo"], tts_dir / f"{i:02d}.wav", ff)
+                edge_tts_synth(s["vo"], tts_dir / f"{i:02d}.wav", ff, s.get("voice", VOICE), s.get("voice_rate", RATE))
             audio_ok, engine = True, f"edge:{VOICE}"
         except Exception as e:  # noqa: BLE001
             print(f"[warn] edge-tts 失败({e})，回退 SAPI 语音")
@@ -526,9 +529,14 @@ def main() -> int:
                 clip_dur = float(probe)
             except Exception:
                 clip_dur = 0.0
-        target = clip_dur or default_dur.get(s["type"], 4.0)
+        clip_start = max(0.0, s.get("clip_start_sec", 0.0))
+        clip_end = s.get("clip_end_sec", 0.0)
+        selected_dur = clip_end - clip_start if clip_end > clip_start else 0.0
+        target = selected_dur or clip_dur or default_dur.get(s["type"], 4.0)
         dur = max(target, vo_dur, min_dur.get(s["type"], 3.0))
         dur = min(dur, max_dur.get(s["type"], 30.0))
+        if selected_dur:
+            dur = min(dur, selected_dur)
         if audio_ok:
             wavs.append(wp)
         timeline.append({"seg": s, "start": t0, "adur": dur})
@@ -546,7 +554,7 @@ def main() -> int:
         if clip:
             dst = tmp_dir / f"bg_{i:02d}.mp4"
             try:
-                normalize_clip(clip, dst, e["adur"] + GAP, ff)
+                normalize_clip(clip, dst, e["adur"] + GAP, ff, e["seg"].get("clip_start_sec", 0.0))
                 e["bg"] = dst
                 e["src"] = clip.name
             except Exception as ex:  # noqa: BLE001

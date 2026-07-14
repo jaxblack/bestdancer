@@ -20,6 +20,16 @@ REPO = Path(__file__).resolve().parents[1]
 ADMIN = REPO / "admin"
 WEEKLY = REPO / "config" / "weekly"
 INCOMING = REPO / "assets" / "incoming"
+PREVIEW_AUDIO = ADMIN / "audio"
+PREVIEW_VIDEO = ADMIN / "video-preview"
+VOICE_PRESETS = {
+    "zh-CN-XiaoyiNeural": {"label": "晓伊", "style": "活力女声"},
+    "zh-CN-XiaoxiaoNeural": {"label": "晓晓", "style": "元气女声"},
+    "zh-CN-XiaohanNeural": {"label": "晓涵", "style": "轻快女声"},
+    "zh-CN-YunxiNeural": {"label": "云希", "style": "清爽男声"},
+    "zh-CN-YunyangNeural": {"label": "云扬", "style": "磁性男声"},
+}
+VOICE_RATES = {"+0%", "+12%", "+20%"}
 DEFAULT_SETTINGS = {
     "keywords": ["urban dance 编舞", "编舞 完整", "kpop dance cover"],
     "platforms": ["douyin"],
@@ -96,6 +106,10 @@ def normalize_candidate(item: dict, index: int) -> dict:
         "local_path": item.get("local_path", ""),
         "manual_note": item.get("manual_note", ""),
         "narration": item.get("narration", ""),
+        "voice": item.get("voice", "zh-CN-XiaoyiNeural"),
+        "voice_rate": item.get("voice_rate", "+20%"),
+        "clip_start_sec": max(0, float(item.get("clip_start_sec") or 0)),
+        "clip_end_sec": max(0, float(item.get("clip_end_sec") or 0)),
         "source_desc": item.get("source_desc", ""),
         "download_status": item.get("download_status", "unknown"),
     }
@@ -105,6 +119,13 @@ def selected_ids(config: dict) -> list[str]:
     top = [pick.get("id") for pick in config.get("picks", []) if pick.get("id")]
     classic = config.get("classic_comeback", {}).get("id")
     return top + ([classic] if classic else [])
+
+
+def default_narration(item: dict, rank: int | None = None, classic: bool = False) -> str:
+    creator = str(item.get("creator", "")).lstrip("@") or "这位编舞者"
+    dance_type = item.get("dance_type", "街舞") or "街舞"
+    prefix = "特别加映" if classic else f"第{rank}名" if rank else "本周推荐"
+    return f"{prefix}，{dance_type}，来自 {creator}。"
 
 
 def workspaces(recent_weeks: int = 12) -> list[dict]:
@@ -137,7 +158,9 @@ def build_editor_config(week: str, payload: dict) -> dict:
         difficulty = item.pop("difficulty", None) or {"stars": 3.0, "fit": item["dance_type"], "scores": {}}
         picks.append({"rank": rank, "id": candidate_id, "reason": item.get("manual_note", ""),
                       "highlight_hint": "", "cut_suggestion": "", "difficulty": difficulty})
-        narration.append({"segment": "top", "rank": rank, "vo": item.get("narration", ""), "subtitle": [],
+        narration.append({"segment": "top", "rank": rank, "vo": item.get("narration", "").strip() or default_narration(item, rank),
+                  "voice": item.get("voice", "zh-CN-XiaoyiNeural"),
+                  "voice_rate": item.get("voice_rate", "+20%"), "subtitle": [],
                           "on_screen": {"stars": difficulty.get("stars", 3.0), "tag": f"本周No.{rank}",
                                         "core_moves": [item["dance_type"]]}, "beginner_tip": ""})
     classic_id = selected[5] if len(selected) > 5 and selected[5] in candidates else None
@@ -145,11 +168,15 @@ def build_editor_config(week: str, payload: dict) -> dict:
     classic = {}
     if classic_id:
         classic = {"id": classic_id, "reason": "特别加映", "difficulty": {"stars": 3.0, "fit": "基础练习", "scores": {}}}
-        narration.append({"segment": "classic", "rank": None, "vo": "", "subtitle": [],
+        narration.append({"segment": "classic", "rank": None, "vo": default_narration(classic_pool[0], classic=True), "voice": "zh-CN-XiaoyiNeural",
+                  "voice_rate": "+20%", "subtitle": [],
                           "on_screen": {"stars": 3.0, "tag": "特别加映", "core_moves": [classic_pool[0]["dance_type"]]},
                           "beginner_tip": ""})
+    metadata = {**old.get("metadata", {})}
+    if "video_description" in payload:
+        metadata["video_description"] = str(payload.get("video_description", "")).strip()
     config = {**old, "this_week_candidates": list(candidates.values()), "classics_pool": classic_pool,
-              "picks": picks, "classic_comeback": classic, "narration": narration}
+              "picks": picks, "classic_comeback": classic, "narration": narration, "metadata": metadata}
     config["episode"].update(payload.get("episode", {}))
     return config
 
@@ -221,6 +248,74 @@ def start_job(name: str, command: list[str]) -> dict:
     return job
 
 
+def synthesize_preview(week: str, candidate_id: str, text: str, voice: str, rate: str) -> str:
+    if voice not in VOICE_PRESETS:
+        raise ValueError("不支持的配音音色")
+    if rate not in VOICE_RATES:
+        raise ValueError("不支持的配音语速")
+    text = " ".join(text.split())
+    if not text:
+        raise ValueError("请先填写口播文案")
+    if len(text) > 300:
+        raise ValueError("试听文案不能超过 300 个字符")
+    safe_week = re.fullmatch(r"\d{4}-W\d{2}", week)
+    safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", candidate_id)[:64]
+    if not safe_week or not safe_id:
+        raise ValueError("无效的工作区或候选编号")
+    output_dir = PREVIEW_AUDIO / week
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output = output_dir / f"{safe_id}.mp3"
+    tts_code = (
+        "import asyncio, sys, edge_tts; "
+        "asyncio.run(edge_tts.Communicate(sys.argv[1], sys.argv[2], rate=sys.argv[3]).save(sys.argv[4]))"
+    )
+    try:
+        subprocess.run(
+            [PYTHON_COMMAND, "-c", tts_code, text, voice, rate, str(output)],
+            check=True, capture_output=True, text=True,
+        )
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or "未知错误").strip()
+        raise ValueError(f"试听生成失败: {detail[-240:]}") from error
+    return f"/audio/{week}/{safe_id}.mp3"
+
+
+def candidate_video_path(week: str, candidate_id: str) -> Path:
+    config = load_config(week)
+    candidates = config.get("this_week_candidates", []) + config.get("classics_pool", [])
+    candidate = next((item for item in candidates if item.get("id") == candidate_id), None)
+    if not candidate or not candidate.get("local_path"):
+        raise ValueError("请先下载或同步本地视频后再预览片段")
+    source = (REPO / candidate["local_path"]).resolve()
+    incoming = (INCOMING / week).resolve()
+    if incoming not in source.parents or not source.is_file():
+        raise ValueError("本地视频路径无效")
+    return source
+
+
+def render_clip_preview(week: str, candidate_id: str, start: float, end: float) -> str:
+    if not re.fullmatch(r"\d{4}-W\d{2}", week):
+        raise ValueError("无效的工作区")
+    safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", candidate_id)[:64]
+    if not safe_id or start < 0 or end <= start:
+        raise ValueError("结束时间必须大于开始时间")
+    duration = min(end - start, 60.0)
+    source = candidate_video_path(week, candidate_id)
+    output_dir = PREVIEW_VIDEO / week
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output = output_dir / f"{safe_id}.mp4"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{start:.3f}", "-i", str(source),
+             "-t", f"{duration:.3f}", "-movflags", "+faststart", "-c:v", "libx264", "-c:a", "aac", str(output)],
+            check=True, capture_output=True, text=True,
+        )
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or "未知错误").strip()
+        raise ValueError(f"视频预览生成失败: {detail[-240:]}") from error
+    return f"/video-preview/{week}/{safe_id}.mp4"
+
+
 class App(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args: object) -> None:
         print("[admin] " + fmt % args)
@@ -286,6 +381,19 @@ class App(SimpleHTTPRequestHandler):
                 return
             if self.path == "/api/import":
                 self.send_json({"ok": True, "config": import_downloads(body["week"])})
+                return
+            if self.path == "/api/voice-preview":
+                audio_url = synthesize_preview(
+                    body["week"], body["candidate_id"], body.get("text", ""),
+                    body.get("voice", "zh-CN-XiaoyiNeural"), body.get("rate", "+20%"),
+                )
+                self.send_json({"ok": True, "audio_url": audio_url})
+                return
+            if self.path == "/api/clip-preview":
+                video_url = render_clip_preview(
+                    body["week"], body["candidate_id"], float(body.get("start", 0)), float(body.get("end", 0)),
+                )
+                self.send_json({"ok": True, "video_url": video_url})
                 return
             if self.path == "/api/action":
                 week, action = body["week"], body["action"]

@@ -10,9 +10,15 @@ const api = async (path, options = {}) => {
 const lines = (value) => value.split("\n").map((item) => item.trim()).filter(Boolean);
 function candidates() { return [...document.querySelectorAll("#candidate-list .candidate-card")].map((row) => ({
   id: row.dataset.id, source: row.dataset.source, duration_sec: Number(row.dataset.duration || 0), like: Number(row.dataset.like || 0), play: Number(row.dataset.play || 0), tags: JSON.parse(row.dataset.tags || "[]"), url: row.dataset.url, local_path: row.dataset.localPath || "", manual_note: row.dataset.note || "", source_desc: row.dataset.sourceDesc || "", download_status: row.dataset.downloadStatus || "unknown", chosen: row.querySelector(".chosen").checked, order: Number(row.querySelector(".order").value || 999),
-  dance_type: row.querySelector(".dance-type").value.trim(), title: row.querySelector(".title").value.trim(), creator: row.querySelector(".creator").value.trim(), narration: row.querySelector(".narration").value.trim(), difficulty: { stars: Number(row.querySelector(".stars").value), fit: row.querySelector(".dance-type").value.trim(), scores: {} }
+  dance_type: row.querySelector(".dance-type").value.trim(), title: row.querySelector(".title").value.trim(), creator: row.querySelector(".creator").value.trim(), narration: row.querySelector(".narration").value.trim(), voice: row.querySelector(".voice").value, voice_rate: row.querySelector(".voice-rate").value, clip_start_sec: Number(row.querySelector(".clip-start").value || 0), clip_end_sec: Number(row.querySelector(".clip-end").value || 0), difficulty: { stars: Number(row.querySelector(".stars").value), fit: row.querySelector(".dance-type").value.trim(), scores: {} }
 })); }
 function selected() { return candidates().filter((item) => item.chosen).sort((left, right) => left.order - right.order).map((item) => item.id); }
+function defaultNarration(item) {
+  const order = selectedOrder.indexOf(item.id);
+  const prefix = order === 5 ? "特别加映" : order >= 0 ? `第${order + 1}名` : "本周推荐";
+  const creator = (item.creator || "这位编舞者").replace(/^@/, "");
+  return `${prefix}，${item.dance_type || "街舞"}，来自 ${creator}。`;
+}
 function renderCandidates() {
   const list = $("#candidate-list"); list.replaceChildren();
   const items = [...(state.config.this_week_candidates || []), ...(state.config.classics_pool || [])].sort((a,b) => (b.like || 0) - (a.like || 0));
@@ -24,13 +30,46 @@ function renderCandidates() {
     const status = document.createElement("span"); status.className=`download ${row.dataset.downloadStatus}`; status.textContent={ready:"可下载",downloaded:"已下载",unavailable:"不可下载",failed:"下载失败",link_only:"已采集链接"}[row.dataset.downloadStatus] || "待检测"; row.querySelector(".download-cell").append(status);
     const danceType = item.dance_type || "Urban";
     row.querySelector(".dance-type").value=[...row.querySelector(".dance-type").options].some((option) => option.value === danceType) ? danceType : "Urban";
-    row.querySelector(".order").value=selectedOrder.indexOf(item.id) + 1 || ""; row.querySelector(".title").value=item.title || ""; row.querySelector(".creator").value=item.creator || ""; row.querySelector(".narration").value=item.narration || item.source_desc || ""; row.querySelector(".stars").value=Math.round(item.difficulty?.stars || 3);
-    const link=row.querySelector(".source-link"); link.href=item.url || "#"; link.textContent=item.url ? "打开" : "待补";
+    row.querySelector(".order").value=selectedOrder.indexOf(item.id) + 1 || ""; row.querySelector(".title").value=item.title || ""; row.querySelector(".creator").value=item.creator || ""; row.querySelector(".narration").value=item.narration || defaultNarration(item); row.querySelector(".clip-start").value=item.clip_start_sec || 0; row.querySelector(".clip-end").value=item.clip_end_sec || item.duration_sec || ""; row.querySelector(".voice").value=item.voice || "zh-CN-XiaoyiNeural"; row.querySelector(".voice-rate").value=item.voice_rate || "+20%"; row.querySelector(".stars").value=Math.round(item.difficulty?.stars || 3);
+    const link=row.querySelector(".source-link"); link.href=item.url || "#"; link.textContent=item.url ? "原平台预览" : "原链接待补";
+    row.querySelector(".preview-clip").addEventListener("click", async () => {
+      const button = row.querySelector(".preview-clip"); const status = row.querySelector(".clip-status"); const player = row.querySelector(".clip-player");
+      const start = Number(row.querySelector(".clip-start").value || 0); const end = Number(row.querySelector(".clip-end").value || 0);
+      if (end <= start) { status.textContent = "结束秒数要大于开始秒数"; return; }
+      button.disabled = true; status.textContent = "生成片段...";
+      try {
+        const result = await api("/api/clip-preview", { method: "POST", body: JSON.stringify({ week: $("#week").value, candidate_id: item.id, start, end }) });
+        player.src = `${result.video_url}?v=${Date.now()}`; player.hidden = false; await player.play(); status.textContent = "片段已生成";
+      } catch (error) { status.textContent = error.message; }
+      finally { button.disabled = false; }
+    });
+    row.querySelector(".preview-voice").addEventListener("click", async () => {
+      const button = row.querySelector(".preview-voice"); const status = row.querySelector(".voice-status"); const player = row.querySelector(".voice-player");
+      button.disabled = true; status.textContent = "生成中...";
+      try {
+        const result = await api("/api/voice-preview", { method: "POST", body: JSON.stringify({ week: $("#week").value, candidate_id: item.id, text: row.querySelector(".narration").value.trim(), voice: row.querySelector(".voice").value, rate: row.querySelector(".voice-rate").value }) });
+        player.src = `${result.audio_url}?v=${Date.now()}`; player.hidden = false; await player.play(); status.textContent = "试听已生成";
+      } catch (error) { status.textContent = error.message; }
+      finally { button.disabled = false; }
+    });
     row.querySelector(".chosen").addEventListener("change", (event) => { if (event.target.checked) selectedOrder.push(item.id); else selectedOrder = selectedOrder.filter((id) => id !== item.id); renderCandidates(); });
     row.querySelector(".order").addEventListener("change", () => { selectedOrder = selected(); }); list.append(row);
   }
 }
-function payload() { return { week: $("#week").value, episode: { week: $("#week").value }, candidates: candidates(), selected: selected().slice(0,6) }; }
+function payload() { return { week: $("#week").value, episode: { week: $("#week").value }, candidates: candidates(), selected: selected().slice(0,6), video_description: $("#video-description").value.trim() }; }
+function buildVideoDescription() {
+  const all = new Map(candidates().map((item) => [item.id, item]));
+  const ranked = selected().map((id) => all.get(id)).filter(Boolean);
+  const week = $("#week").value.replace(/^(\d{4})-W(\d{2})$/, "$1 年第$2周");
+  if (!ranked.length) return `${week}热舞又来啦！先在候选池勾选并排好本期视频，再生成排行榜。`;
+  const list = ranked.map((item, index) => {
+    const prefix = index < 5 ? `${index + 1}.` : "特别加映：";
+    const title = item.title ? `《${item.title.replace(/[《》]/g, "")}》` : item.dance_type || "本周编舞";
+    const creator = item.creator || "原作者待补充";
+    return `${prefix} ${title} · ${creator}\n${item.url || "原链接待补充"}`;
+  }).join("\n\n");
+  return `${week}热舞又来啦！这周的编舞里，有没有一支让你忍不住想跟跳？\n\n本期排行榜：\n${list}\n\n#热舞榜 #编舞 #街舞 #BestDancer`;
+}
 function selectedPlatforms() { return [...document.querySelectorAll(".platform:checked")].map((input) => input.value); }
 function renderPlatforms(platforms) { document.querySelectorAll(".platform").forEach((input) => { input.checked = platforms.includes(input.value); }); $("#platform-all").checked = selectedPlatforms().length === document.querySelectorAll(".platform").length; }
 function renderWorkspaces(workspaces, activeWeek) {
@@ -50,7 +89,7 @@ function renderWorkspaces(workspaces, activeWeek) {
     list.append(button);
   }
 }
-async function load() { state=await api(`/api/state?week=${encodeURIComponent($("#week").value)}`); selectedOrder=[...state.selected]; const settings=state.settings; $("#keywords").value=settings.keywords.join("\n"); $("#top-limit").value=settings.top_limit; $("#min-likes").value=settings.min_likes || 0; $("#recent-days").value=settings.recent_days || 7; $("#sort-by").value=settings.sort_by || "heat_desc"; $("#videos-only").checked=settings.videos_only !== false; renderPlatforms(settings.platforms || ["douyin"]); renderCandidates(); const workspaceData=await api(`/api/workspaces?recent=${encodeURIComponent($("#workspace-range").value)}`); renderWorkspaces(workspaceData.workspaces, state.week); $("#status").textContent=`${state.week} 已载入`; }
+async function load() { state=await api(`/api/state?week=${encodeURIComponent($("#week").value)}`); selectedOrder=[...state.selected]; const settings=state.settings; $("#keywords").value=settings.keywords.join("\n"); $("#top-limit").value=settings.top_limit; $("#min-likes").value=settings.min_likes || 0; $("#recent-days").value=settings.recent_days || 7; $("#sort-by").value=settings.sort_by || "heat_desc"; $("#videos-only").checked=settings.videos_only !== false; renderPlatforms(settings.platforms || ["douyin"]); renderCandidates(); $("#video-description").value=state.config.metadata?.video_description || buildVideoDescription(); const workspaceData=await api(`/api/workspaces?recent=${encodeURIComponent($("#workspace-range").value)}`); renderWorkspaces(workspaceData.workspaces, state.week); $("#status").textContent=`${state.week} 已载入`; }
 async function saveConfig() { const result=await api("/api/save",{method:"POST",body:JSON.stringify(payload())}); state.config=result.config; state.selected=selected(); $("#status").textContent="本期编排已保存"; }
 async function action(name) { await saveConfig(); const result=await api("/api/action",{method:"POST",body:JSON.stringify({week:$("#week").value,action:name})}); const labels={render:"正在生成视频",discover:"正在粗筛候选",download:"正在下载入选视频"}; $("#status").textContent=`${labels[name]}（任务 ${result.job.id}）`; pollJobs(); }
 async function pollJobs(){ const result=await api("/api/jobs"); const job=result.jobs.at(-1); if(!job)return; $("#job-output").textContent=job.output || "任务启动中..."; $("#status").textContent=`${job.name}: ${job.status}`; if(job.status === "running") setTimeout(pollJobs,1200); }
@@ -76,6 +115,8 @@ function updateWorkflowStep() {
 window.addEventListener("scroll", updateWorkflowStep, { passive: true });
 updateWorkflowStep();
 $("#week").onchange=load; $("#workspace-range").onchange=load; $("#reload").onclick=load; $("#save-config").onclick=saveConfig; $("#render").onclick=()=>action("render"); $("#render-bottom").onclick=()=>action("render");
+$("#generate-description").onclick=()=>{$("#video-description").value=buildVideoDescription(); $("#status").textContent="已按本期顺序生成视频简介";};
+$("#copy-description").onclick=async()=>{const text=$("#video-description").value.trim(); if(!text)return; await navigator.clipboard.writeText(text); $("#status").textContent="视频简介已复制";};
 $("#platform-all").onchange=(event)=>{document.querySelectorAll(".platform").forEach((input)=>{input.checked=event.target.checked;});};
 document.querySelectorAll(".platform").forEach((input)=>input.addEventListener("change",()=>{$("#platform-all").checked=selectedPlatforms().length===document.querySelectorAll(".platform").length;}));
 $("#save-settings").onclick=async()=>{const settings={keywords:lines($("#keywords").value),platforms:selectedPlatforms(),top_limit:Number($("#top-limit").value),min_likes:Number($("#min-likes").value || 0),recent_days:Number($("#recent-days").value),sort_by:$("#sort-by").value,videos_only:$("#videos-only").checked};await api("/api/settings",{method:"POST",body:JSON.stringify(settings)});$("#status").textContent="发现规则已保存";};
