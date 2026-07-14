@@ -8,8 +8,9 @@
 ## 用户 & 项目硬约束（不要忘）
 
 - **成人向街舞周刊**：只要**完整舞段**。禁止：教学/分解/tutorial/零基础/基本功/路演/vlog/花絮/慢动作/萌娃/少儿/battle/裁判秀/reaction/翻车。
-- 每段 **≥10 秒**（voice pad 到 10s+ 保音画同步）。
+- 每段 **10-20 秒**（自动用真片自身长度 clamp），总时长 **1-3 分钟合理**，不是硬限制。
 - **必须有字幕 + 必须有片尾**（"谢谢观看/关注追更"卡片）。
+- **字幕不用标点，用空格分隔**（`Urban   @dbgtmlt`）。VO 口播保留标点（TTS 断句需要），但画面字幕的 `vo_caption` 会 `re.sub` 去掉 `，。？！、,.!?`。
 - **文案禁止 AI 编造、禁止扒别人 caption**。只能写「舞种 · @真实作者」。
 - **署名必须真实**：只能从 `aweme_detail.author.nickname` 取，不能挂 `@1milliondance` 这种默认值。
 - 说话时 **BGM 自动 duck**（sidechain compressor），别盖住人声。
@@ -114,11 +115,13 @@ open output/<week>_demo.mp4
 ## `render_demo.py` 已做的重要改动（不要回退）
 
 1. `build_segments()` 中 vo 强制现场生成：`f"第{rank}名，{dance_type}，来自 {creator}。"`
-2. `subtitles` 只放一条：`f"{dance_type} · {creator}"`
-3. `default_dur = {"intro":5, "top":11, "classic":11, "outro":6}` + `min_dur` 保底
-4. `concat_wavs(files, out, target_durs=[...])` 支持 pad 静音到目标段时长（音画同步关键）
-5. VO 大字幕黑底叠加（画面中下部，`vo_caption` 字段驱动）
-6. 混音 sidechain ducking：`[1:a]volume=2.2,asplit=2[vo][voside]; [2:a]volume=0.75; sidechaincompress=threshold=0.05:ratio=12:attack=8:release=350:makeup=1`
+2. `subtitles` 只放一条：`f"{dance_type}   {creator}"`（三空格分隔，无标点）
+3. `vo_caption` 用 `re.sub(r"[，。！？、,\.!\?]+", " ", full_vo)` 去掉画面字幕的标点
+4. 段时长逻辑：**用真片自身 duration（ffprobe 探测）**，clamp 到 `min_dur=10s / max_dur=20s`（top/classic），`default=15s`；VO 长了也会拉长
+5. `concat_wavs(files, out, target_durs=[...])` 支持 pad 静音到目标段时长（音画同步关键）
+6. VO 大字幕黑底叠加（画面中下部，`vo_caption` 字段驱动）
+7. 混音 sidechain ducking：`[1:a]volume=2.2,asplit=2[vo][voside]; [2:a]volume=0.75; sidechaincompress=threshold=0.05:ratio=12:attack=8:release=350:makeup=1`
+8. `default_dur.outro=6s / max_dur.outro=8s` 保片尾能看清
 
 ## Config schema 简化版
 

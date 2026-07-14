@@ -170,10 +170,10 @@ def build_segments(cfg: dict) -> list[dict]:
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
             "title": cand.get("dance_type", "街舞"),
             "creator": clean(cand.get("creator", "")),
-            "cap": cand.get("dance_type", "街舞") + " · " + clean(cand.get("creator", "")),
+            "cap": cand.get("dance_type", "街舞") + "   " + clean(cand.get("creator", "")),
             "tip": "",
-            "subtitles": [cand.get("dance_type", "街舞") + " · " + clean(cand.get("creator", ""))],
-            "vo_caption": full_vo,
+            "subtitles": [cand.get("dance_type", "街舞") + "   " + clean(cand.get("creator", ""))],
+            "vo_caption": re.sub(r"[，。！？、,\.!\?]+", " ", full_vo).strip(),
         })
 
     segs.append({"type": "outro", "cid": None,
@@ -507,14 +507,28 @@ def main() -> int:
             except Exception as e2:  # noqa: BLE001
                 print(f"[warn] SAPI 也失败({e2})，出无声样片")
 
-    default_dur = {"intro": 5.0, "top": 11.0, "classic": 11.0, "outro": 6.0}
+    default_dur = {"intro": 5.0, "top": 15.0, "classic": 15.0, "outro": 6.0}
     min_dur = {"intro": 4.0, "top": 10.0, "classic": 10.0, "outro": 6.0}
+    max_dur = {"intro": 8.0, "top": 20.0, "classic": 20.0, "outro": 8.0}
     timeline, t0, wavs = [], 0.0, []
     for i, s in enumerate(segs):
         wp = tts_dir / f"{i:02d}.wav"
-        dur = wav_dur(wp) if audio_ok else default_dur.get(s["type"], 4.0)
-        # 保底最短时长：AI 说完还得留时间让观众看清舞和字幕
-        dur = max(dur, min_dur.get(s["type"], 3.0))
+        vo_dur = wav_dur(wp) if audio_ok else 0
+        # 真片本身多长？拿到就用真片长度 clamp 到 [min,max]
+        clip = find_clip(args.week, s.get("cid")) if s.get("cid") else None
+        clip_dur = 0.0
+        if clip:
+            try:
+                probe = subprocess.check_output(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "default=noprint_wrappers=1:nokey=1", str(clip)],
+                    text=True).strip()
+                clip_dur = float(probe)
+            except Exception:
+                clip_dur = 0.0
+        target = clip_dur or default_dur.get(s["type"], 4.0)
+        dur = max(target, vo_dur, min_dur.get(s["type"], 3.0))
+        dur = min(dur, max_dur.get(s["type"], 30.0))
         if audio_ok:
             wavs.append(wp)
         timeline.append({"seg": s, "start": t0, "adur": dur})
