@@ -50,12 +50,32 @@ BGM_PATH = REPO / "assets" / "bgm" / "auto_beat.wav"
 sys.path.insert(0, str(Path(__file__).parent))
 
 
+# 跨平台中文字体候选：Windows 微软雅黑 / macOS PingFang·STHeiti·Hiragino / Linux Noto
+_FONT_CANDIDATES_BOLD = [
+    "C:/Windows/Fonts/msyhbd.ttc", "C:/Windows/Fonts/msyh.ttc",
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/STHeiti Medium.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+]
+_FONT_CANDIDATES_REG = [
+    "C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/msyhl.ttc",
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/STHeiti Light.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+]
+
+
 def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    names = ["msyhbd.ttc", "msyh.ttc"] if bold else ["msyh.ttc", "msyhl.ttc"]
-    for n in names:
-        p = Path("C:/Windows/Fonts") / n
-        if p.exists():
-            return ImageFont.truetype(str(p), size)
+    for p in (_FONT_CANDIDATES_BOLD if bold else _FONT_CANDIDATES_REG):
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:  # noqa: BLE001
+                continue
     return ImageFont.load_default()
 
 
@@ -137,7 +157,7 @@ def build_segments(cfg: dict) -> list[dict]:
         fit = diff.get("fit", "")
         moves = osd.get("core_moves", [])
         move0 = moves[0] if moves else "核心动作"
-        full_vo = first_sentences(sanitize_tts(item.get("vo", "")), 3) or f"第{rank}名，{tts_title}，{stars:g}星。"
+        full_vo = first_sentences(sanitize_tts(item.get("vo", "")), 2) or f"第{rank}名，{tts_title}，{stars:g}星。"
         if top:
             cap = f"{fit} · 重点练{move0}"
         else:
