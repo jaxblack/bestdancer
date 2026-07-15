@@ -4,7 +4,7 @@ import json, shutil, subprocess
 from pathlib import Path
 
 REPO = Path("/Users/jax/bestdancer")
-WEEK = "2026-W29"
+WEEK = "2026-W28"
 BASE = REPO / "assets" / "incoming" / WEEK
 DL2 = BASE / "dl2"
 OUT = REPO / "config" / "weekly" / f"{WEEK}.json"

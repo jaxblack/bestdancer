@@ -1,0 +1,335 @@
+{
+  "_readme": "auto: real Douyin adult complete choreography only",
+  "episode": {
+    "week": "2026-W28",
+    "theme": "抖音完整编舞精选",
+    "platforms": [
+      "douyin"
+    ],
+    "voice": "young_female",
+    "top_n": 5,
+    "classic_n": 1
+  },
+  "this_week_candidates": [
+    {
+      "id": "c1",
+      "source": "抖音",
+      "creator": "@dbgtmlt",
+      "title": "Urban Dance",
+      "song": "",
+      "duration_sec": 25.5,
+      "like": 1709,
+      "tags": [
+        "hasumi编舞",
+        "urban编舞",
+        "hiphop",
+        "dance",
+        "抖音潮流舞蹈地图"
+      ],
+      "url": "https://www.douyin.com/video/7603011422755083249",
+      "dance_type": "Urban Dance",
+      "local_path": "assets/incoming/2026-W28/c1__douyin__7603011422755083249.mp4"
+    },
+    {
+      "id": "c2",
+      "source": "抖音",
+      "creator": "@猴哥🐒",
+      "title": "Urban Dance",
+      "song": "",
+      "duration_sec": 28.9,
+      "like": 692,
+      "tags": [
+        "原创编舞",
+        "春娇与志明",
+        "猴哥编舞",
+        "抒情urban"
+      ],
+      "url": "https://www.douyin.com/video/7553646178404683059",
+      "dance_type": "Urban Dance",
+      "local_path": "assets/incoming/2026-W28/c2__douyin__7553646178404683059.mp4"
+    },
+    {
+      "id": "c3",
+      "source": "抖音",
+      "creator": "@TOP舞蹈工作室（招新）",
+      "title": "Urban Dance",
+      "song": "",
+      "duration_sec": 19.4,
+      "like": 559,
+      "tags": [
+        "胆小鬼舞蹈挑战",
+        "katie编舞",
+        "抖音热门舞蹈计划",
+        "hiphop",
+        "urbandance"
+      ],
+      "url": "https://www.douyin.com/video/7620357632369732607",
+      "dance_type": "Urban Dance",
+      "local_path": "assets/incoming/2026-W28/c3__douyin__7620357632369732607.mp4"
+    },
+    {
+      "id": "c4",
+      "source": "抖音",
+      "creator": "@Myangz（努力冲一万粉..）",
+      "title": "Urban Dance",
+      "song": "",
+      "duration_sec": 38.1,
+      "like": 35,
+      "tags": [
+        "第三个吻痕",
+        "小泉编舞",
+        "抖音潮流舞蹈地图",
+        "dance",
+        "urban编舞"
+      ],
+      "url": "https://www.douyin.com/video/7622541813286526394",
+      "dance_type": "Urban Dance",
+      "local_path": "assets/incoming/2026-W28/c4__douyin__7622541813286526394.mp4"
+    },
+    {
+      "id": "c5",
+      "source": "抖音",
+      "creator": "@火星兔子街舞",
+      "title": "Hip-hop",
+      "song": "",
+      "duration_sec": 34.8,
+      "like": 25,
+      "tags": [
+        "第一次爱的人",
+        "猴哥编舞",
+        "hiphop",
+        "抖音潮流舞蹈地图"
+      ],
+      "url": "https://www.douyin.com/video/7618552148116881521",
+      "dance_type": "Hip-hop",
+      "local_path": "assets/incoming/2026-W28/c5__douyin__7618552148116881521.mp4"
+    }
+  ],
+  "classics_pool": [
+    {
+      "id": "k1",
+      "source": "抖音",
+      "creator": "@PeekabooDance（视频展示版）",
+      "title": "Urban Dance",
+      "song": "",
+      "duration_sec": 23.0,
+      "like": 23,
+      "tags": [
+        "urban编舞",
+        "cuckoo编舞",
+        "不只是场梦"
+      ],
+      "url": "https://www.douyin.com/video/7514582541883034934",
+      "dance_type": "Urban Dance",
+      "local_path": "assets/incoming/2026-W28/k1__douyin__7514582541883034934.mp4"
+    }
+  ],
+  "picks": [
+    {
+      "rank": 1,
+      "id": "c1",
+      "reason": "",
+      "highlight_hint": "",
+      "cut_suggestion": "",
+      "difficulty": {
+        "scores": {
+          "tempo": 3,
+          "complexity": 3,
+          "control": 3,
+          "memory": 3,
+          "stamina": 3
+        },
+        "weighted": 3.0,
+        "stars": 3.0,
+        "fit": "Urban Dance",
+        "hardest_part": ""
+      }
+    },
+    {
+      "rank": 2,
+      "id": "c2",
+      "reason": "",
+      "highlight_hint": "",
+      "cut_suggestion": "",
+      "difficulty": {
+        "scores": {
+          "tempo": 3,
+          "complexity": 3,
+          "control": 3,
+          "memory": 3,
+          "stamina": 3
+        },
+        "weighted": 3.0,
+        "stars": 3.0,
+        "fit": "Urban Dance",
+        "hardest_part": ""
+      }
+    },
+    {
+      "rank": 3,
+      "id": "c3",
+      "reason": "",
+      "highlight_hint": "",
+      "cut_suggestion": "",
+      "difficulty": {
+        "scores": {
+          "tempo": 3,
+          "complexity": 3,
+          "control": 3,
+          "memory": 3,
+          "stamina": 3
+        },
+        "weighted": 3.0,
+        "stars": 3.0,
+        "fit": "Urban Dance",
+        "hardest_part": ""
+      }
+    },
+    {
+      "rank": 4,
+      "id": "c4",
+      "reason": "",
+      "highlight_hint": "",
+      "cut_suggestion": "",
+      "difficulty": {
+        "scores": {
+          "tempo": 3,
+          "complexity": 3,
+          "control": 3,
+          "memory": 3,
+          "stamina": 3
+        },
+        "weighted": 3.0,
+        "stars": 3.0,
+        "fit": "Urban Dance",
+        "hardest_part": ""
+      }
+    },
+    {
+      "rank": 5,
+      "id": "c5",
+      "reason": "",
+      "highlight_hint": "",
+      "cut_suggestion": "",
+      "difficulty": {
+        "scores": {
+          "tempo": 3,
+          "complexity": 3,
+          "control": 3,
+          "memory": 3,
+          "stamina": 3
+        },
+        "weighted": 3.0,
+        "stars": 3.0,
+        "fit": "Hip-hop",
+        "hardest_part": ""
+      }
+    }
+  ],
+  "classic_comeback": {
+    "id": "k1",
+    "reason": "同期高热完整编舞",
+    "difficulty": {
+      "scores": {
+        "tempo": 3,
+        "complexity": 3,
+        "control": 3,
+        "memory": 3,
+        "stamina": 3
+      },
+      "weighted": 3.0,
+      "stars": 3.0,
+      "fit": "随意练",
+      "hardest_part": "跟节奏"
+    }
+  },
+  "narration": [
+    {
+      "segment": "top",
+      "rank": 1,
+      "vo": "",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3.0,
+        "tag": "本周No.1",
+        "core_moves": [
+          "Urban Dance"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "top",
+      "rank": 2,
+      "vo": "",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3.0,
+        "tag": "本周No.2",
+        "core_moves": [
+          "Urban Dance"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "top",
+      "rank": 3,
+      "vo": "",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3.0,
+        "tag": "本周No.3",
+        "core_moves": [
+          "Urban Dance"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "top",
+      "rank": 4,
+      "vo": "",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3.0,
+        "tag": "本周No.4",
+        "core_moves": [
+          "Urban Dance"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "top",
+      "rank": 5,
+      "vo": "",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3.0,
+        "tag": "本周No.5",
+        "core_moves": [
+          "Hip-hop"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "classic",
+      "rank": null,
+      "vo": "",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3.0,
+        "tag": "特别加映",
+        "core_moves": [
+          "Urban Dance"
+        ]
+      },
+      "beginner_tip": ""
+    }
+  ],
+  "metadata": {
+    "source": "douyin urban 编舞 filtered"
+  }
+}
