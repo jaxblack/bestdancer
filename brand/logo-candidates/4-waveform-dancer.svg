@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Waveform Dancer">
+  <defs>
+    <radialGradient id="bg4" cx="50%" cy="40%" r="78%">
+      <stop offset="0%" stop-color="#1C1D36"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <linearGradient id="bar4" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#16E0FF"/>
+      <stop offset="100%" stop-color="#FF2E9A"/>
+    </linearGradient>
+    <linearGradient id="pc4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glow4" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg4)"/>
+
+  <!-- equalizer bars -->
+  <g fill="url(#bar4)" opacity="0.55">
+    <rect x="70"  y="330" width="20" height="60"  rx="10"/>
+    <rect x="104" y="292" width="20" height="98"  rx="10"/>
+    <rect x="138" y="238" width="20" height="152" rx="10"/>
+    <rect x="172" y="286" width="20" height="104" rx="10"/>
+    <rect x="206" y="200" width="20" height="190" rx="10"/>
+    <rect x="240" y="150" width="20" height="240" rx="10"/>
+    <rect x="274" y="188" width="20" height="202" rx="10"/>
+    <rect x="308" y="224" width="20" height="166" rx="10"/>
+    <rect x="342" y="176" width="20" height="214" rx="10"/>
+    <rect x="376" y="252" width="20" height="138" rx="10"/>
+    <rect x="410" y="296" width="20" height="94"  rx="10"/>
+    <rect x="444" y="336" width="20" height="54"  rx="10"/>
+  </g>
+
+  <!-- baseline -->
+  <rect x="60" y="388" width="392" height="5" rx="2.5" fill="url(#pc4)" opacity="0.8" filter="url(#glow4)"/>
+
+  <!-- jumping dancer -->
+  <g stroke="url(#pc4)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow4)">
+    <path d="M256 168 L256 232"/>
+    <path d="M256 178 L218 150 L206 104"/>
+    <path d="M256 178 L294 150 L306 104"/>
+    <path d="M256 232 L224 276 L212 322"/>
+    <path d="M256 232 L288 276 L300 322"/>
+  </g>
+  <circle cx="256" cy="130" r="24" fill="#0B0B14" stroke="url(#pc4)" stroke-width="12" filter="url(#glow4)"/>
+  <g filter="url(#glow4)">
+    <circle cx="206" cy="104" r="7" fill="#FFE14D"/>
+    <circle cx="306" cy="104" r="7" fill="#FFE14D"/>
+    <circle cx="212" cy="322" r="7" fill="#16E0FF"/>
+    <circle cx="300" cy="322" r="7" fill="#16E0FF"/>
+  </g>
+</svg>

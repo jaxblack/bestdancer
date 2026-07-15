@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Neural B">
+  <defs>
+    <radialGradient id="bg2" cx="50%" cy="40%" r="78%">
+      <stop offset="0%" stop-color="#1C1D36"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <linearGradient id="pc2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glow2" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg2)"/>
+
+  <!-- edges -->
+  <g stroke="url(#pc2)" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#glow2)">
+    <!-- spine -->
+    <path d="M182 136 L182 206 L182 258 L182 330 L182 382"/>
+    <!-- upper bowl -->
+    <path d="M182 136 L266 136 L330 172 L302 214 L182 258"/>
+    <!-- lower bowl -->
+    <path d="M182 258 L286 258 L352 318 L300 382 L182 382"/>
+  </g>
+  <!-- faint network cross-links -->
+  <g stroke="#16E0FF" stroke-width="2" opacity="0.4" stroke-dasharray="4 6" fill="none">
+    <path d="M182 136 L330 172"/>
+    <path d="M182 258 L352 318"/>
+    <path d="M266 136 L302 214"/>
+    <path d="M286 258 L300 382"/>
+    <path d="M182 206 L266 136"/>
+  </g>
+
+  <!-- nodes -->
+  <g filter="url(#glow2)">
+    <circle cx="182" cy="136" r="11" fill="#FFFFFF"/>
+    <circle cx="182" cy="206" r="9" fill="#FF2E9A"/>
+    <circle cx="182" cy="258" r="11" fill="#FFE14D"/>
+    <circle cx="182" cy="330" r="9" fill="#16E0FF"/>
+    <circle cx="182" cy="382" r="11" fill="#FFFFFF"/>
+    <circle cx="266" cy="136" r="9" fill="#FF2E9A"/>
+    <circle cx="330" cy="172" r="10" fill="#FFFFFF"/>
+    <circle cx="302" cy="214" r="8" fill="#16E0FF"/>
+    <circle cx="286" cy="258" r="9" fill="#FF2E9A"/>
+    <circle cx="352" cy="318" r="11" fill="#FFFFFF"/>
+    <circle cx="300" cy="382" r="9" fill="#16E0FF"/>
+  </g>
+</svg>

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Neon Star Dancer">
+  <defs>
+    <linearGradient id="bgA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="50%" stop-color="#7B2FF7"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <radialGradient id="haloA" cx="50%" cy="44%" r="55%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edgeA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glowA" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bgA)"/>
+
+  <!-- radiating beams -->
+  <g fill="#FFFFFF" opacity="0.08">
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(0 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(15 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(30 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(45 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(60 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(75 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(90 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(105 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(120 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(135 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(150 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(165 250 236)"/>
+  </g>
+
+  <!-- center halo -->
+  <rect width="512" height="512" fill="url(#haloA)"/>
+
+  <!-- neon glow silhouette -->
+  <g stroke="url(#edgeA)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glowA)" opacity="0.95">
+    <path d="M346 92 L310 150 L250 195 L262 300"/>
+    <path d="M250 195 L188 224 L150 286"/>
+    <path d="M262 300 L284 372 L300 436"/>
+    <path d="M262 300 L210 360 L176 424"/>
+  </g>
+  <circle cx="250" cy="150" r="35" fill="url(#edgeA)" filter="url(#glowA)"/>
+
+  <!-- white core silhouette -->
+  <g stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M346 92 L310 150 L250 195 L262 300"/>
+    <path d="M250 195 L188 224 L150 286"/>
+    <path d="M262 300 L284 372 L300 436"/>
+    <path d="M262 300 L210 360 L176 424"/>
+  </g>
+  <circle cx="250" cy="150" r="29" fill="#FFFFFF"/>
+
+  <!-- AI data particles from raised hand -->
+  <g filter="url(#glowA)">
+    <rect x="352" y="72" width="11" height="11" rx="2.5" fill="#FFE14D" transform="rotate(18 357 77)"/>
+    <circle cx="382" cy="98" r="5.5" fill="#16E0FF"/>
+    <rect x="366" y="116" width="8" height="8" rx="2" fill="#FF2E9A" transform="rotate(12 370 120)"/>
+    <circle cx="396" cy="70" r="4" fill="#FFFFFF"/>
+    <circle cx="334" cy="58" r="4" fill="#16E0FF"/>
+    <rect x="404" y="118" width="6" height="6" rx="1.5" fill="#FFE14D"/>
+  </g>
+
+  <!-- fashion sparkles -->
+  <g filter="url(#glowA)">
+    <path transform="translate(104 168)" d="M0,-16 C2.5,-5 5,-2.5 16,0 C5,2.5 2.5,5 0,16 C-2.5,5 -5,2.5 -16,0 C-5,-2.5 -2.5,-5 0,-16 Z" fill="#FFFFFF"/>
+    <path transform="translate(408 322) scale(0.8)" d="M0,-16 C2.5,-5 5,-2.5 16,0 C5,2.5 2.5,5 0,16 C-2.5,5 -5,2.5 -16,0 C-5,-2.5 -2.5,-5 0,-16 Z" fill="#FFE14D"/>
+    <path transform="translate(150 404) scale(0.55)" d="M0,-16 C2.5,-5 5,-2.5 16,0 C5,2.5 2.5,5 0,16 C-2.5,5 -5,2.5 -16,0 C-5,-2.5 -2.5,-5 0,-16 Z" fill="#FFFFFF"/>
+  </g>
+</svg>

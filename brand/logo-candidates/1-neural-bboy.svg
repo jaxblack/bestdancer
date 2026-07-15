@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Neural B-Boy">
+  <defs>
+    <radialGradient id="bg1" cx="50%" cy="38%" r="78%">
+      <stop offset="0%" stop-color="#1C1D36"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <linearGradient id="pc1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="52%" stop-color="#B36BFF"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glow1" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg1)"/>
+
+  <!-- neon rings -->
+  <circle cx="256" cy="252" r="196" fill="none" stroke="url(#pc1)" stroke-width="5"
+          stroke-linecap="round" stroke-dasharray="2 30" opacity="0.7" filter="url(#glow1)"/>
+  <circle cx="256" cy="252" r="174" fill="none" stroke="#16E0FF" stroke-width="2"
+          stroke-dasharray="1 15" opacity="0.35"/>
+
+  <!-- neural connective lines -->
+  <g stroke="#16E0FF" stroke-width="2" opacity="0.5" stroke-dasharray="4 7" fill="none">
+    <path d="M210 96 L392 182"/>
+    <path d="M150 404 L286 420"/>
+    <path d="M210 96 L150 404"/>
+    <path d="M392 182 L286 420"/>
+  </g>
+
+  <!-- dancer skeleton -->
+  <g stroke="url(#pc1)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow1)">
+    <path d="M286 182 L250 292"/>
+    <path d="M286 182 L238 150 L210 96"/>
+    <path d="M286 182 L348 206 L392 182"/>
+    <path d="M250 292 L300 356 L286 420"/>
+    <path d="M250 292 L196 352 L150 404"/>
+  </g>
+
+  <!-- head -->
+  <circle cx="292" cy="148" r="27" fill="#0B0B14" stroke="url(#pc1)" stroke-width="12" filter="url(#glow1)"/>
+
+  <!-- joint nodes -->
+  <g filter="url(#glow1)">
+    <circle cx="286" cy="182" r="7" fill="#FFFFFF"/>
+    <circle cx="250" cy="292" r="7" fill="#FFFFFF"/>
+    <circle cx="238" cy="150" r="6" fill="#FFFFFF"/>
+    <circle cx="210" cy="96"  r="7.5" fill="#FFE14D"/>
+    <circle cx="348" cy="206" r="6" fill="#FFFFFF"/>
+    <circle cx="392" cy="182" r="7.5" fill="#FFE14D"/>
+    <circle cx="300" cy="356" r="6" fill="#FFFFFF"/>
+    <circle cx="286" cy="420" r="7.5" fill="#16E0FF"/>
+    <circle cx="196" cy="352" r="6" fill="#FFFFFF"/>
+    <circle cx="150" cy="404" r="7.5" fill="#16E0FF"/>
+  </g>
+</svg>

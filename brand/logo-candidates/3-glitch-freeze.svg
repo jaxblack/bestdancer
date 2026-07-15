@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Glitch Freeze">
+  <defs>
+    <radialGradient id="bg3" cx="50%" cy="42%" r="78%">
+      <stop offset="0%" stop-color="#17182B"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <filter id="glow3" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="frame3"><rect width="512" height="512" rx="116"/></clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg3)"/>
+
+  <g clip-path="url(#frame3)">
+    <!-- side-freeze figure, defined once, no color -->
+    <g id="fig3" fill="none" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="232" cy="214" r="24"/>
+      <path d="M248 258 L212 312 L180 362"/>
+      <path d="M248 258 L292 214 L300 168"/>
+      <path d="M248 258 L336 244"/>
+      <path d="M336 244 L398 232 L438 258"/>
+      <path d="M336 244 L372 300 L420 326"/>
+    </g>
+
+    <!-- RGB split copies -->
+    <use href="#fig3" stroke="#16E0FF" transform="translate(-8,0)" style="mix-blend-mode:screen" filter="url(#glow3)"/>
+    <use href="#fig3" stroke="#FF2E9A" transform="translate(8,0)" style="mix-blend-mode:screen" filter="url(#glow3)"/>
+    <use href="#fig3" stroke="#FFFFFF"/>
+
+    <!-- glitch displacement bars -->
+    <g style="mix-blend-mode:screen">
+      <rect x="0" y="196" width="512" height="10" fill="#16E0FF" opacity="0.55" transform="translate(24,0)"/>
+      <rect x="0" y="286" width="512" height="8"  fill="#FF2E9A" opacity="0.55" transform="translate(-30,0)"/>
+      <rect x="0" y="330" width="512" height="6"  fill="#FFE14D" opacity="0.5"  transform="translate(18,0)"/>
+    </g>
+
+    <!-- scanlines -->
+    <g fill="#0B0B14" opacity="0.5">
+      <rect x="0" y="150" width="512" height="4"/>
+      <rect x="0" y="240" width="512" height="4"/>
+      <rect x="0" y="300" width="512" height="4"/>
+      <rect x="0" y="368" width="512" height="4"/>
+    </g>
+  </g>
+</svg>

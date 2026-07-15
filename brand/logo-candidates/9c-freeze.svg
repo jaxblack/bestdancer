@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Breaking Freeze">
+  <defs>
+    <radialGradient id="bgD" cx="50%" cy="40%" r="78%">
+      <stop offset="0%" stop-color="#EAF0FF"/>
+      <stop offset="42%" stop-color="#B36BFF"/>
+      <stop offset="100%" stop-color="#16A9FF"/>
+    </radialGradient>
+    <radialGradient id="haloD" cx="50%" cy="42%" r="52%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="chrome" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#16E0FF"/>
+      <stop offset="30%" stop-color="#FFFFFF"/>
+      <stop offset="50%" stop-color="#FF7AC6"/>
+      <stop offset="70%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#7B2FF7"/>
+    </linearGradient>
+    <filter id="glowD" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bgD)"/>
+
+  <g fill="#FFFFFF" opacity="0.10">
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(0 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(22.5 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(45 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(67.5 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(90 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(112.5 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(135 256 236)"/>
+    <rect x="248" y="-60" width="5" height="620" transform="rotate(157.5 256 236)"/>
+  </g>
+
+  <rect width="512" height="512" fill="url(#haloD)"/>
+
+  <!-- dark edge: one-hand freeze, legs folded in the air -->
+  <g stroke="#0B0B14" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M196 424 L208 356 L226 292"/>
+    <path d="M226 292 L318 262"/>
+    <path d="M318 262 L360 200 L406 168"/>
+    <path d="M318 262 L372 296 L352 360"/>
+  </g>
+  <circle cx="214" cy="300" r="34" fill="#0B0B14"/>
+
+  <!-- chrome -->
+  <g stroke="url(#chrome)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M196 424 L208 356 L226 292"/>
+    <path d="M226 292 L318 262"/>
+    <path d="M318 262 L360 200 L406 168"/>
+    <path d="M318 262 L372 296 L352 360"/>
+  </g>
+  <circle cx="214" cy="300" r="28" fill="url(#chrome)"/>
+
+  <!-- Y2K sparkles -->
+  <g>
+    <path transform="translate(420 140)" d="M0,-22 C3.6,-7 7,-3.6 22,0 C7,3.6 3.6,7 0,22 C-3.6,7 -7,3.6 -22,0 C-7,-3.6 -3.6,-7 0,-22 Z" fill="#FFFFFF" filter="url(#glowD)"/>
+    <path transform="translate(140 200) scale(0.6)" d="M0,-22 C3.6,-7 7,-3.6 22,0 C7,3.6 3.6,7 0,22 C-3.6,7 -7,3.6 -22,0 C-7,-3.6 -3.6,-7 0,-22 Z" fill="#FFE14D" filter="url(#glowD)"/>
+    <path transform="translate(150 430) scale(0.5)" d="M0,-22 C3.6,-7 7,-3.6 22,0 C7,3.6 3.6,7 0,22 C-3.6,7 -7,3.6 -22,0 C-7,-3.6 -3.6,-7 0,-22 Z" fill="#FFFFFF" filter="url(#glowD)"/>
+  </g>
+</svg>

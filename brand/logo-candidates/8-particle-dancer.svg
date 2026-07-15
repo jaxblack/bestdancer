@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Particle Dancer">
+  <defs>
+    <radialGradient id="bgC" cx="50%" cy="40%" r="82%">
+      <stop offset="0%" stop-color="#2A1650"/>
+      <stop offset="60%" stop-color="#140C28"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <radialGradient id="haloC" cx="50%" cy="42%" r="50%">
+      <stop offset="0%" stop-color="#16E0FF" stop-opacity="0.35"/>
+      <stop offset="55%" stop-color="#7B2FF7" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#7B2FF7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edgeC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="52%" stop-color="#B36BFF"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glowC" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bgC)"/>
+  <rect width="512" height="512" fill="url(#haloC)"/>
+
+  <!-- particle silhouette (dotted stroke) -->
+  <g stroke="url(#edgeC)" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 26" fill="none" filter="url(#glowC)">
+    <path d="M346 92 L310 150 L250 195 L262 300"/>
+    <path d="M250 195 L188 224 L150 286"/>
+    <path d="M262 300 L284 372 L300 436"/>
+    <path d="M262 300 L210 360 L176 424"/>
+  </g>
+  <!-- finer secondary dots -->
+  <g stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-dasharray="0 30" fill="none" opacity="0.85" filter="url(#glowC)">
+    <path d="M346 92 L310 150 L250 195 L262 300"/>
+    <path d="M250 195 L188 224 L150 286"/>
+    <path d="M262 300 L284 372 L300 436"/>
+    <path d="M262 300 L210 360 L176 424"/>
+  </g>
+  <!-- head as ring of dots -->
+  <circle cx="250" cy="150" r="30" fill="none" stroke="url(#edgeC)" stroke-width="15" stroke-linecap="round" stroke-dasharray="0 21" filter="url(#glowC)"/>
+  <circle cx="250" cy="150" r="30" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 24" opacity="0.85"/>
+
+  <!-- free-floating particles -->
+  <g filter="url(#glowC)">
+    <circle cx="360" cy="80" r="5" fill="#16E0FF"/>
+    <circle cx="392" cy="104" r="3.5" fill="#FFFFFF"/>
+    <circle cx="376" cy="132" r="4" fill="#FF2E9A"/>
+    <circle cx="404" cy="66" r="3" fill="#FFE14D"/>
+    <circle cx="132" cy="300" r="4.5" fill="#16E0FF"/>
+    <circle cx="120" cy="256" r="3" fill="#FFFFFF"/>
+    <circle cx="150" cy="330" r="3.5" fill="#FF2E9A"/>
+    <circle cx="330" cy="420" r="4" fill="#16E0FF"/>
+    <circle cx="300" cy="452" r="3" fill="#FFFFFF"/>
+    <circle cx="196" cy="452" r="3.5" fill="#FFE14D"/>
+    <circle cx="230" cy="118" r="3" fill="#16E0FF"/>
+    <circle cx="288" cy="120" r="3.5" fill="#FF2E9A"/>
+  </g>
+
+  <!-- sparkles -->
+  <g filter="url(#glowC)">
+    <path transform="translate(108 180)" d="M0,-14 C2.3,-4.6 4.6,-2.3 14,0 C4.6,2.3 2.3,4.6 0,14 C-2.3,4.6 -4.6,2.3 -14,0 C-4.6,-2.3 -2.3,-4.6 0,-14 Z" fill="#FFFFFF"/>
+    <path transform="translate(406 330) scale(0.75)" d="M0,-14 C2.3,-4.6 4.6,-2.3 14,0 C4.6,2.3 2.3,4.6 0,14 C-2.3,4.6 -4.6,2.3 -14,0 C-4.6,-2.3 -2.3,-4.6 0,-14 Z" fill="#FFE14D"/>
+  </g>
+</svg>

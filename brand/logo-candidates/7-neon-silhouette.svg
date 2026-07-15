@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Neon Silhouette Dancer">
+  <defs>
+    <radialGradient id="bgB" cx="50%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="#20213B"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <radialGradient id="haloB" cx="50%" cy="42%" r="52%">
+      <stop offset="0%" stop-color="#FF2E9A" stop-opacity="0.42"/>
+      <stop offset="55%" stop-color="#7B2FF7" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#7B2FF7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edgeB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="52%" stop-color="#B36BFF"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glowB" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bgB)"/>
+
+  <!-- radiating beams -->
+  <g fill="#16E0FF" opacity="0.07">
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(0 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(20 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(40 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(60 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(80 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(100 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(120 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(140 250 236)"/>
+    <rect x="248" y="-60" width="4" height="620" transform="rotate(160 250 236)"/>
+  </g>
+
+  <rect width="512" height="512" fill="url(#haloB)"/>
+
+  <!-- stage ring -->
+  <circle cx="250" cy="236" r="190" fill="none" stroke="url(#edgeB)" stroke-width="4"
+          stroke-linecap="round" stroke-dasharray="2 26" opacity="0.6" filter="url(#glowB)"/>
+
+  <!-- gradient neon silhouette -->
+  <g stroke="url(#edgeB)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glowB)">
+    <path d="M346 92 L310 150 L250 195 L262 300"/>
+    <path d="M250 195 L188 224 L150 286"/>
+    <path d="M262 300 L284 372 L300 436"/>
+    <path d="M262 300 L210 360 L176 424"/>
+  </g>
+  <circle cx="250" cy="150" r="30" fill="url(#edgeB)" filter="url(#glowB)"/>
+
+  <!-- AI data particles -->
+  <g filter="url(#glowB)">
+    <rect x="352" y="72" width="11" height="11" rx="2.5" fill="#FFE14D" transform="rotate(18 357 77)"/>
+    <circle cx="384" cy="98" r="5.5" fill="#16E0FF"/>
+    <rect x="366" y="118" width="8" height="8" rx="2" fill="#FF2E9A" transform="rotate(12 370 122)"/>
+    <circle cx="398" cy="70" r="4" fill="#FFFFFF"/>
+    <circle cx="332" cy="56" r="4" fill="#16E0FF"/>
+  </g>
+
+  <!-- sparkles -->
+  <g filter="url(#glowB)">
+    <path transform="translate(110 176)" d="M0,-15 C2.5,-5 5,-2.5 15,0 C5,2.5 2.5,5 0,15 C-2.5,5 -5,2.5 -15,0 C-5,-2.5 -2.5,-5 0,-15 Z" fill="#FFFFFF"/>
+    <path transform="translate(404 318) scale(0.78)" d="M0,-15 C2.5,-5 5,-2.5 15,0 C5,2.5 2.5,5 0,15 C-2.5,5 -5,2.5 -15,0 C-5,-2.5 -2.5,-5 0,-15 Z" fill="#FFE14D"/>
+  </g>
+</svg>

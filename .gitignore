@@ -14,6 +14,9 @@
 *.jpeg
 # 品牌 logo 例外：允许提交（小体积占位素材）
 !brand/logo.png
+!brand/logo-*.png
+!brand/final_logo.png
+!brand/avatar-round.png
 # 品牌源图（AI 生成，非真人照）例外
 !个人.png
 # 如需保留少量样例,取消注释下面这行或使用 git add -f

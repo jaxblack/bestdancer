@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>角色形象 · 卡通 / 像素</title>
+<style>
+  :root{--pink:#FF2E9A; --cyan:#16E0FF; --yellow:#FFE14D; --ink:#EDEDF5;}
+  *{box-sizing:border-box}
+  body{margin:0; padding:48px 32px 72px; background:radial-gradient(120% 90% at 50% 0%, #16172b 0%, #0B0B14 60%);
+    color:var(--ink); font-family:"Segoe UI",system-ui,-apple-system,"Microsoft YaHei",sans-serif;}
+  header{max-width:980px; margin:0 auto 40px}
+  h1{margin:0 0 8px; font-size:30px; letter-spacing:1px}
+  h1 b{color:var(--pink)} h1 i{font-style:normal; color:var(--cyan)}
+  .sub{color:#9aa0b8; font-size:15px; line-height:1.7; margin:0}
+  .sub b{color:#d6dbf0}
+  .grid{max-width:980px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:28px}
+  .card{background:#111225; border:1px solid #23253f; border-radius:20px; padding:24px; display:flex; flex-direction:column; gap:18px}
+  .shots{display:flex; align-items:center; gap:20px}
+  .square{width:190px; height:190px; border-radius:24px; overflow:hidden; flex:0 0 auto; box-shadow:0 10px 34px rgba(0,0,0,.55)}
+  .square img{width:100%; height:100%; display:block}
+  .avatar{width:104px; height:104px; border-radius:50%; overflow:hidden; flex:0 0 auto; border:2px solid #2a2c4a}
+  .avatar img{width:100%; height:100%; display:block}
+  .avatar-label{font-size:12px; color:#7d84a3; text-align:center; margin-top:6px}
+  .no{display:inline-block; min-width:30px; height:26px; line-height:26px; text-align:center; border-radius:8px;
+      background:linear-gradient(135deg,var(--pink),var(--cyan)); color:#0B0B14; font-weight:700; font-size:14px; margin-right:8px; padding:0 8px}
+  .name{font-size:20px; font-weight:700; margin:0}
+  .zh{color:#c8ccdf; font-size:14px}
+  .desc{margin:0; color:#aab0c8; font-size:14px; line-height:1.7}
+  .note{max-width:980px; margin:34px auto 0; padding:16px 20px; border:1px dashed #2f3252; border-radius:14px; color:#9aa0b8; font-size:13px; line-height:1.7}
+  .note b{color:var(--yellow)}
+</style>
+</head>
+<body>
+<header>
+  <h1>角色形象 · <b>卡通</b> / <i>像素</i></h1>
+  <p class="sub">跟火柴人告别。两个都是<b>原创角色</b>，有发型、五官、服装配色和鞋子，身体部位一眼分得清。先选风格方向，再细化（可出男生版 / 换动作 / 加字）。</p>
+</header>
+
+<main class="grid">
+  <section class="card">
+    <div class="shots">
+      <div class="square"><img src="char-cartoon-girl.svg" alt="Cartoon Girl"/></div>
+      <div><div class="avatar"><img src="char-cartoon-girl.svg" alt=""/></div><div class="avatar-label">头像预览</div></div>
+    </div>
+    <h2 class="name"><span class="no">A</span>扁平卡通潮女 <span class="zh">Flat Cartoon</span></h2>
+    <p class="desc">双丸子头 + 大眼腮红 + 青色卫衣 / 粉色短裤 / 白球鞋，比耶 + 叉腰的活泼跳舞姿势，站在霓虹舞台光上。可爱、亲和，适合美妆舞蹈类账号。</p>
+  </section>
+
+  <section class="card">
+    <div class="shots">
+      <div class="square"><img src="char-pixel-dancer.svg" alt="Pixel Dancer"/></div>
+      <div><div class="avatar"><img src="char-pixel-dancer.svg" alt=""/></div><div class="avatar-label">头像预览</div></div>
+    </div>
+    <h2 class="name"><span class="no">B</span>像素风舞者 <span class="zh">Pixel / Arcade</span></h2>
+    <p class="desc">复古街机跳舞机（DDR / 舞力全开那味）风格，方块像素拼出发型、脸、上衣、裤子、球鞋，双手举起欢呼。潮、有记忆点，缩到很小也认得出。</p>
+  </section>
+</main>
+
+<div class="note">
+  关于“免费 IP”：<b>官方 IP（舞力全开、迪士尼等）有版权，商用/涨粉号用会有风险</b>，所以这两个都是我为你原创的角色，<b>可商用、无版权顾虑</b>，后续还能演化成你账号的固定“吉祥物”。选定方向后我可以：① 出男生版凑成一对；② 换不同舞蹈动作；③ 做带 “BestDancer / 本周热舞” 字样的横版。
+</div>
+</body>
+</html>

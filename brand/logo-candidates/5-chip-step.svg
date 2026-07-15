@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="AI Chip Step">
+  <defs>
+    <radialGradient id="bg5" cx="50%" cy="40%" r="78%">
+      <stop offset="0%" stop-color="#1C1D36"/>
+      <stop offset="100%" stop-color="#0B0B14"/>
+    </radialGradient>
+    <linearGradient id="pc5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2E9A"/>
+      <stop offset="100%" stop-color="#16E0FF"/>
+    </linearGradient>
+    <filter id="glow5" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg5)"/>
+
+  <!-- chip pins -->
+  <g stroke="url(#pc5)" stroke-width="10" stroke-linecap="round" opacity="0.85" filter="url(#glow5)">
+    <path d="M156 106 L156 84"/><path d="M206 106 L206 84"/><path d="M256 106 L256 84"/><path d="M306 106 L306 84"/><path d="M356 106 L356 84"/>
+    <path d="M156 406 L156 428"/><path d="M206 406 L206 428"/><path d="M256 406 L256 428"/><path d="M306 406 L306 428"/><path d="M356 406 L356 428"/>
+    <path d="M106 156 L84 156"/><path d="M106 206 L84 206"/><path d="M106 256 L84 256"/><path d="M106 306 L84 306"/><path d="M106 356 L84 356"/>
+    <path d="M406 156 L428 156"/><path d="M406 206 L428 206"/><path d="M406 256 L428 256"/><path d="M406 306 L428 306"/><path d="M406 356 L428 356"/>
+  </g>
+
+  <!-- chip body -->
+  <rect x="106" y="106" width="300" height="300" rx="44" fill="#0B0B14" stroke="url(#pc5)" stroke-width="6" filter="url(#glow5)"/>
+  <rect x="132" y="132" width="248" height="248" rx="30" fill="none" stroke="#16E0FF" stroke-width="1.5" opacity="0.35"/>
+
+  <!-- corner traces -->
+  <g stroke="#16E0FF" stroke-width="2" opacity="0.4" fill="none" stroke-dasharray="4 6">
+    <path d="M132 176 L176 176 L176 132"/>
+    <path d="M380 176 L336 176 L336 132"/>
+    <path d="M132 336 L176 336 L176 380"/>
+    <path d="M380 336 L336 336 L336 380"/>
+  </g>
+
+  <!-- dancer inside chip -->
+  <g stroke="url(#pc5)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow5)">
+    <path d="M256 224 L238 296"/>
+    <path d="M256 224 L212 232 L192 200"/>
+    <path d="M256 224 L300 240 L322 214"/>
+    <path d="M238 296 L268 344 L258 372"/>
+    <path d="M238 296 L200 336 L176 360"/>
+  </g>
+  <circle cx="264" cy="196" r="21" fill="#0B0B14" stroke="url(#pc5)" stroke-width="10" filter="url(#glow5)"/>
+  <g filter="url(#glow5)">
+    <circle cx="192" cy="200" r="6" fill="#FFE14D"/>
+    <circle cx="322" cy="214" r="6" fill="#FFE14D"/>
+    <circle cx="176" cy="360" r="6" fill="#16E0FF"/>
+    <circle cx="258" cy="372" r="6" fill="#16E0FF"/>
+  </g>
+</svg>
