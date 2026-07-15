@@ -141,7 +141,11 @@ def build_segments(cfg: dict) -> list[dict]:
         "foot": "TOP5 + 特别加映",
     }]
 
-    for item in cfg.get("narration", []):
+    narration_items = sorted(
+        cfg.get("narration", []),
+        key=lambda item: -int(item.get("rank") or 0) if item.get("segment") == "top" else -1,
+    )
+    for item in narration_items:
         top = item.get("segment") == "top"
         rank = item.get("rank")
         if top:

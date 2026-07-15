@@ -17,6 +17,7 @@ parser.add_argument("--week", required=True)
 parser.add_argument("--platforms", required=True, help="Pipe-separated platform ids")
 parser.add_argument("--keywords", default="", help="Pipe-separated keywords")
 parser.add_argument("--top", type=int, default=30)
+parser.add_argument("--backup-limit", type=int, default=10)
 parser.add_argument("--min-likes", type=int, default=0)
 parser.add_argument("--videos-only", action="store_true")
 parser.add_argument("--recent-days", type=int, default=7)
@@ -34,12 +35,14 @@ SEARCHES = {
     "xiaohongshu": ("小红书", lambda keyword: f"https://www.xiaohongshu.com/search_result/?keyword={quote(keyword)}&type=51"),
     "instagram": ("Instagram", lambda keyword: f"https://www.instagram.com/explore/search/keyword/?q={quote(keyword)}"),
     "tiktok": ("TikTok", lambda keyword: f"https://www.tiktok.com/search?q={quote(keyword)}"),
+    "youtube": ("YouTube", lambda keyword: f"https://www.youtube.com/results?search_query={quote(keyword)}"),
 }
 
 LINK_MATCHERS = {
     "xiaohongshu": re.compile(r"^/explore/[0-9a-f]+", re.I),
-    "instagram": re.compile(r"^/(?:p|reel)/[^/]+", re.I),
+    "instagram": re.compile(r"^/reel/[^/]+", re.I),
     "tiktok": re.compile(r"^/@[^/]+/video/\d+", re.I),
+    "youtube": re.compile(r"^/watch", re.I),
 }
 
 
@@ -51,8 +54,9 @@ def write_candidates(platform: str, items: list[dict]) -> None:
 
 if "douyin" in platforms:
     command = [sys.executable, "scripts/douyin_fetch_clean.py", "--mode", "discover", "--week", args.week,
-               "--top", str(args.top), "--keywords", args.keywords]
-    print("=== Douyin: https://www.douyin.com/follow ===", flush=True)
+               "--source", "search", "--top", str(args.top + args.backup_limit), "--keywords", args.keywords,
+               "--recent-days", str(args.recent_days)]
+    print("=== Douyin: native keyword search ===", flush=True)
     subprocess.run(command, cwd=REPO, check=False)
 
 other_platforms = [platform for platform in platforms if platform in SEARCHES]
@@ -71,6 +75,17 @@ def compact_number(value: str) -> int:
 
 
 def parse_published_date(value: str) -> date | None:
+    value = value.strip()
+    hours_match = re.fullmatch(r"(\d+)小时前", value)
+    if hours_match:
+        return date.today()
+    days_match = re.fullmatch(r"(\d+)天前", value)
+    if days_match:
+        return date.today() - timedelta(days=int(days_match.group(1)))
+    if value.startswith("昨天"):
+        return date.today() - timedelta(days=1)
+    if value.startswith("前天"):
+        return date.today() - timedelta(days=2)
     for fmt in ("%B %d, %Y", "%b %d, %Y"):
         try:
             return datetime.strptime(value, fmt).date()
@@ -129,6 +144,65 @@ def tiktok_cards(page) -> list[dict]:
     return results
 
 
+def xiaohongshu_cards(page) -> list[dict]:
+    video_tab = page.get_by_text("视频", exact=True)
+    if not video_tab.count():
+        raise RuntimeError("小红书搜索页未找到视频筛选")
+    video_tab.last.click()
+    time.sleep(1.5)
+    cards = page.locator("a").evaluate_all("""anchors => anchors
+        .filter(anchor => anchor.href.includes('/explore/'))
+        .map(anchor => {
+            const card = anchor.closest('.note-item') || anchor.parentElement;
+            return {url: anchor.href, text: (card?.innerText || anchor.innerText || '').trim()};
+        })""")
+    results, seen = [], set()
+    for card in cards:
+        if card["url"] in seen:
+            continue
+        seen.add(card["url"])
+        lines = [line.strip() for line in card["text"].splitlines() if line.strip()]
+        published_at = next((parsed for line in reversed(lines) if (parsed := parse_published_date(line))), None)
+        if not lines or not published_at:
+            continue
+        results.append({"url": card["url"], "title": lines[0][:120], "source_desc": card["text"][:1000],
+                        "creator": lines[1] if len(lines) > 1 else "", "like": compact_number(lines[-1]),
+                        "is_video": True, "published_at": published_at})
+    return results
+
+
+def click_filter(page, label: str) -> None:
+    option = page.get_by_text(label, exact=True)
+    if not option.count():
+        raise RuntimeError(f"未找到原生筛选项: {label}")
+    option.last.click(timeout=10000)
+    time.sleep(1.2)
+
+
+def youtube_cards(page) -> list[dict]:
+    click_filter(page, "过滤")
+    click_filter(page, "本周")
+    click_filter(page, "过滤")
+    click_filter(page, "长视频")
+    click_filter(page, "过滤")
+    click_filter(page, "热门程度")
+    cards = page.locator("ytd-video-renderer").evaluate_all("""cards => cards.map(card => {
+        const title = card.querySelector('a#video-title');
+        const channel = card.querySelector('ytd-channel-name a');
+        return {url: title?.href || '', title: (title?.innerText || '').trim(), creator: (channel?.innerText || '').trim(), text: (card.innerText || '').trim()};
+    })""")
+    results = []
+    for card in cards:
+        if not card["url"] or not card["title"]:
+            continue
+        lines = [line.strip() for line in card["text"].splitlines() if line.strip()]
+        results.append({"url": card["url"], "title": card["title"][:120], "source_desc": card["text"][:1000],
+                        "creator": card["creator"], "like": 0,
+                        "play_count": compact_number(next((line for line in lines if "views" in line.lower()), "")),
+                        "is_video": True, "published_at": date.today()})
+    return results
+
+
 def search_candidates(context, platform: str, source: str, search_url) -> list[dict]:
     result_page = context.new_page()
     detail_page = context.new_page()
@@ -137,13 +211,25 @@ def search_candidates(context, platform: str, source: str, search_url) -> list[d
     try:
         for keyword in keywords:
             url = search_url(keyword)
-            result_page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            result_page.goto(url, wait_until="commit" if platform == "youtube" else "domcontentloaded", timeout=60000)
             time.sleep(3)
             body_text = result_page.locator("body").inner_text()
             if "登录后查看搜索结果" in body_text or "登录以搜索热门内容" in body_text:
                 raise RuntimeError(f"{source} 公开搜索页未登录，请在 Chrome 中登录 {urlparse(url).netloc}")
             if platform == "tiktok":
                 for card in tiktok_cards(result_page):
+                    if card["url"] not in found_urls:
+                        found_urls.append(card["url"])
+                        card_by_url[card["url"]] = card
+                continue
+            if platform == "xiaohongshu":
+                for card in xiaohongshu_cards(result_page):
+                    if card["url"] not in found_urls:
+                        found_urls.append(card["url"])
+                        card_by_url[card["url"]] = card
+                continue
+            if platform == "youtube":
+                for card in youtube_cards(result_page):
                     if card["url"] not in found_urls:
                         found_urls.append(card["url"])
                         card_by_url[card["url"]] = card
@@ -160,8 +246,10 @@ def search_candidates(context, platform: str, source: str, search_url) -> list[d
         if not found_urls:
             raise RuntimeError(f"{source} 搜索页未返回可见结果；请确认公开站已登录并能显示搜索卡片")
         items = []
-        for href in found_urls:
-            if platform == "tiktok":
+        # Search pages can expose hundreds of cards. Limit costly detail navigation per platform
+        # so one blocked site cannot stall the entire cross-platform batch.
+        for href in found_urls[:max((args.top + args.backup_limit) * 2, 12)]:
+            if platform in {"xiaohongshu", "tiktok", "youtube"}:
                 details = card_by_url[href]
             else:
                 try:
@@ -180,10 +268,14 @@ def search_candidates(context, platform: str, source: str, search_url) -> list[d
                 "title": details["title"] or "待人工补充", "source_desc": details["source_desc"],
                 "creator": details["creator"], "like": details["like"], "play_count": 0,
                 "duration_sec": 0, "dance_type": "Urban", "download_status": "link_only",
+                "media_type": "video",
             })
-            if len(items) >= args.top:
+            if len(items) >= args.top + args.backup_limit:
                 break
-        return sorted(items, key=lambda item: item["like"], reverse=True)
+        ranked = sorted(items, key=lambda item: item["like"], reverse=True)
+        for index, item in enumerate(ranked):
+            item["candidate_tier"] = "top" if index < args.top else "backup"
+        return ranked
     finally:
         result_page.close()
         detail_page.close()

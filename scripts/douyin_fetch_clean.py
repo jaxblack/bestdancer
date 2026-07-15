@@ -8,6 +8,7 @@ Output:
 """
 import argparse
 import json, re, time, subprocess, sys
+from datetime import date, timedelta
 sys.stdout.reconfigure(line_buffering=True)
 from pathlib import Path
 from urllib.parse import quote
@@ -20,6 +21,7 @@ parser.add_argument("--mode", choices=("discover", "download"), default="discove
 parser.add_argument("--source", choices=("follow", "search"), default="follow",
                     help="Discover from the followed feed or keyword search")
 parser.add_argument("--top", type=int, default=30, help="Number of ranked candidates to retain")
+parser.add_argument("--recent-days", type=int, default=7, help="Maximum candidate age for discovery")
 parser.add_argument("--ids", default="", help="Pipe-separated Douyin video IDs selected for download")
 args = parser.parse_args()
 
@@ -97,7 +99,8 @@ def collect_search_ids(page):
         for label in (sort, published_at):
             option = page.get_by_text(label, exact=True)
             if not option.count():
-                raise RuntimeError(f"抖音筛选面板未找到选项: {label}")
+                print(f"  筛选项不可用，改用详情元数据过滤: {label}", flush=True)
+                continue
             option.last.click()
             time.sleep(0.8)
         for match in re.finditer(r"/video/(\d{15,25})", page.content()):
@@ -130,6 +133,7 @@ def parse_detail(data):
         "author": author.get("nickname", ""),
         "sec_uid": author.get("sec_uid", ""),
         "duration_sec": round(dur_ms / 1000, 1) if dur_ms else 0,
+        "published_at": time.strftime("%Y-%m-%d", time.localtime(aw.get("create_time", 0))) if aw.get("create_time") else "",
         "like": stats.get("digg_count", 0),
         "play_count": stats.get("play_count", 0),
         "tags": tags,
@@ -257,7 +261,9 @@ with sync_playwright() as p:
         excl = should_exclude(full_text)
         dur = d["duration_sec"]
         keyword_ok = not KEYWORDS or any(keyword.lower() in full_text.lower() for keyword in KEYWORDS)
-        ok = (not excl) and keyword_ok and (15 <= dur <= 100)
+        published_at = d.get("published_at", "")
+        recent_ok = bool(published_at) and published_at >= (date.today() - timedelta(days=args.recent_days)).isoformat()
+        ok = (not excl) and keyword_ok and (15 <= dur <= 100) and recent_ok
         flag = "KEEP" if ok else "drop"
         print(f"[{i:02d}] {vid} {dur}s ❤{d['like']} {flag} | {d['author']} | {d['desc'][:40]}", flush=True)
         if ok:

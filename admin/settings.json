@@ -1,15 +1,18 @@
 {
   "keywords": [
-    "urban",
-    "kpop",
-    "jazz",
-    "hiphop",
-    "编舞"
+    "urban dance 编舞",
+    "编舞 完整",
+    "kpop dance cover"
   ],
   "platforms": [
-    "douyin"
+    "douyin",
+    "instagram",
+    "tiktok",
+    "xiaohongshu"
   ],
-  "top_limit": 30,
+  "top_limit": 10,
   "min_likes": 0,
-  "videos_only": true
+  "videos_only": true,
+  "recent_days": 7,
+  "sort_by": "heat_desc"
 }

@@ -25,14 +25,15 @@ PREVIEW_VIDEO = ADMIN / "video-preview"
 VOICE_PRESETS = {
     "zh-CN-XiaoyiNeural": {"label": "晓伊", "style": "活力女声"},
     "zh-CN-XiaoxiaoNeural": {"label": "晓晓", "style": "元气女声"},
-    "zh-CN-XiaohanNeural": {"label": "晓涵", "style": "轻快女声"},
     "zh-CN-YunxiNeural": {"label": "云希", "style": "清爽男声"},
     "zh-CN-YunyangNeural": {"label": "云扬", "style": "磁性男声"},
+    "zh-CN-YunxiaNeural": {"label": "云夏", "style": "轻快男声"},
+    "zh-CN-YunjianNeural": {"label": "云健", "style": "沉稳男声"},
 }
 VOICE_RATES = {"+0%", "+12%", "+20%"}
 DEFAULT_SETTINGS = {
     "keywords": ["urban dance 编舞", "编舞 完整", "kpop dance cover"],
-    "platforms": ["douyin"],
+    "platforms": ["douyin", "instagram", "tiktok", "xiaohongshu"],
     "top_limit": 30,
     "min_likes": 0,
     "videos_only": True,
@@ -49,7 +50,12 @@ def iso_week() -> str:
     return f"{year}-W{week:02d}"
 
 
+WEEK_ID = re.compile(r"\d{4}-W\d{2}(?:-[AB])?$")
+
+
 def config_path(week: str) -> Path:
+    if not WEEK_ID.fullmatch(week):
+        raise ValueError("工作区格式应为 YYYY-Www、YYYY-Www-A 或 YYYY-Www-B")
     return WEEKLY / f"{week}.json"
 
 
@@ -91,6 +97,7 @@ def save_settings(settings: dict) -> None:
 
 def normalize_candidate(item: dict, index: int) -> dict:
     candidate_id = item.get("id") or f"c{index}"
+    voice = item.get("voice", "zh-CN-XiaoyiNeural")
     return {
         "id": candidate_id,
         "source": item.get("source", "抖音"),
@@ -106,12 +113,13 @@ def normalize_candidate(item: dict, index: int) -> dict:
         "local_path": item.get("local_path", ""),
         "manual_note": item.get("manual_note", ""),
         "narration": item.get("narration", ""),
-        "voice": item.get("voice", "zh-CN-XiaoyiNeural"),
+        "voice": voice if voice in VOICE_PRESETS else "zh-CN-XiaoyiNeural",
         "voice_rate": item.get("voice_rate", "+20%"),
         "clip_start_sec": max(0, float(item.get("clip_start_sec") or 0)),
         "clip_end_sec": max(0, float(item.get("clip_end_sec") or 0)),
         "source_desc": item.get("source_desc", ""),
         "download_status": item.get("download_status", "unknown"),
+        "candidate_tier": "backup" if item.get("candidate_tier") == "backup" else "top",
     }
 
 
@@ -135,7 +143,7 @@ def workspaces(recent_weeks: int = 12) -> list[dict]:
         for offset in range(recent_weeks)
         for week_date in [date.today() - timedelta(weeks=offset)]
     }
-    weeks.update(path.stem for path in WEEKLY.glob("????-W??.json"))
+    weeks.update(path.stem for path in WEEKLY.glob("????-W??*.json") if WEEK_ID.fullmatch(path.stem))
     summaries = []
     for week in sorted(weeks, reverse=True):
         config = load_config(week)
@@ -150,6 +158,11 @@ def build_editor_config(week: str, payload: dict) -> dict:
     entries = [normalize_candidate(item, i + 1) for i, item in enumerate(payload.get("candidates", []))]
     selected = payload.get("selected", [])[:6]
     candidates = {item["id"]: item for item in entries}
+    duplicates = historical_urls(week)
+    selected_urls = [canonical_url(candidates[candidate_id].get("url", "")) for candidate_id in selected if candidate_id in candidates]
+    repeated = [url for url in selected_urls if url and (url in duplicates or selected_urls.count(url) > 1)]
+    if repeated:
+        raise ValueError("本期入选含有往期或本期重复视频，请更换候选")
     picks, narration = [], []
     for rank, candidate_id in enumerate(selected[:5], 1):
         item = candidates.get(candidate_id)
@@ -181,19 +194,46 @@ def build_editor_config(week: str, payload: dict) -> dict:
     return config
 
 
+def canonical_url(value: str) -> str:
+    parsed = urlparse(value.strip())
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
+
+
+def historical_urls(active_week: str) -> set[str]:
+    urls = set()
+    for path in WEEKLY.glob("????-W??*.json"):
+        if path.stem == active_week or not WEEK_ID.fullmatch(path.stem):
+            continue
+        try:
+            config = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        for item in config.get("this_week_candidates", []) + config.get("classics_pool", []):
+            normalized = canonical_url(item.get("url", ""))
+            if normalized:
+                urls.add(normalized)
+    return urls
+
+
 def import_downloads(week: str) -> dict:
     incoming = INCOMING / week
     base = incoming / "dl2"
     config = load_config(week)
-    current = {c["url"]: c for c in config.get("this_week_candidates", []) if c.get("url")}
+    current = {canonical_url(c["url"]): c for c in config.get("this_week_candidates", []) if c.get("url")}
+    historical = historical_urls(week)
     generic_candidates = incoming / "candidates"
     for candidate_path in sorted(generic_candidates.glob("*.json")):
         for index, item in enumerate(json.loads(candidate_path.read_text(encoding="utf-8")), 1):
             url = item.get("url", "")
-            if not url:
+            if not url or item.get("media_type") not in {None, "video"}:
                 continue
-            current[url] = normalize_candidate({
-                **item, "id": current.get(url, {}).get("id", item.get("id", f"g{index}")),
+            if canonical_url(url) in historical:
+                continue
+            normalized_url = canonical_url(url)
+            current[normalized_url] = normalize_candidate({
+                **item, "id": current.get(normalized_url, {}).get("id", item.get("id", f"g{index}")),
             }, index)
     ranked_path = incoming / "ranked_candidates.json"
     if ranked_path.exists():
@@ -202,26 +242,34 @@ def import_downloads(week: str) -> dict:
             if not video_id:
                 continue
             url = f"https://www.douyin.com/video/{video_id}"
+            if canonical_url(url) in historical:
+                continue
             local_video = base / f"{video_id}.mp4"
-            current[url] = normalize_candidate({
-                "id": current.get(url, {}).get("id", f"c{index}"), "creator": "@" + item.get("author", ""),
+            normalized_url = canonical_url(url)
+            current[normalized_url] = normalize_candidate({
+                "id": current.get(normalized_url, {}).get("id", f"c{index}"), "creator": "@" + item.get("author", ""),
                 "title": item.get("desc", "")[:60], "source_desc": item.get("desc", ""), "like": item.get("like", 0),
                 "play": item.get("play_count", 0), "duration_sec": item.get("duration_sec", 0),
                 "tags": item.get("tags", []), "url": url, "dance_type": item.get("dance_type", "街舞"),
                 "download_status": item.get("download_status", "unknown"),
                 "local_path": str(local_video.relative_to(REPO)) if local_video.exists() else "",
+                "candidate_tier": "top" if index <= 10 else "backup",
             }, index)
     for index, meta_path in enumerate(sorted(base.glob("*.json")), 1):
         item = json.loads(meta_path.read_text(encoding="utf-8"))
         video_id = str(item.get("id", meta_path.stem))
         url = f"https://www.douyin.com/video/{video_id}"
-        current[url] = normalize_candidate({
-            "id": current.get(url, {}).get("id", f"c{index}"), "creator": "@" + item.get("author", ""),
+        if canonical_url(url) in historical:
+            continue
+        normalized_url = canonical_url(url)
+        current[normalized_url] = normalize_candidate({
+            "id": current.get(normalized_url, {}).get("id", f"c{index}"), "creator": "@" + item.get("author", ""),
             "title": item.get("desc", "")[:60], "source_desc": item.get("desc", ""), "like": item.get("like", 0),
             "play": item.get("play_count", 0), "duration_sec": item.get("duration_sec", 0),
             "tags": item.get("tags", []), "url": url, "dance_type": item.get("dance_type", "街舞"),
                 "download_status": "downloaded",
             "local_path": str(meta_path.with_suffix(".mp4").relative_to(REPO)),
+            "candidate_tier": "top" if index <= 10 else "backup",
         }, index)
     config["this_week_candidates"] = sorted(current.values(), key=lambda c: c.get("like", 0), reverse=True)
     save_config(week, config)
@@ -372,6 +420,8 @@ class App(SimpleHTTPRequestHandler):
                 return
             if self.path == "/api/manual-link":
                 week, url = body["week"], body["url"].strip()
+                if canonical_url(url) in historical_urls(week):
+                    raise ValueError("该视频已在往期使用，不能重复加入候选池")
                 config = load_config(week)
                 candidates = config["this_week_candidates"]
                 candidates.append(normalize_candidate({"id": f"m{len(candidates) + 1}", "url": url,

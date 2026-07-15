@@ -162,6 +162,8 @@
 .candidate-card .heat { margin-left: auto; font-size: 15px; }
 .candidate-card .heat small { display: inline; margin-left: 6px; }
 .candidate-card .source-link { margin-left: 4px; white-space: nowrap; }
+.candidate-tier { padding: 3px 7px; border: 1px solid #06a9b4; border-radius: 3px; color: #067b83; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.candidate-tier.backup { border-color: #a4a095; color: #73746e; }
 
 .candidate-fields {
   display: grid;

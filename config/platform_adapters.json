@@ -66,15 +66,6 @@
       "available_fields": ["caption", "author", "likes", "publish_date", "video_url"],
       "status": "verified"
     },
-    "bilibili": {
-      "name": "Bilibili",
-      "entry": "https://search.bilibili.com/all?keyword={keyword}",
-      "mode": "keyword_search",
-      "native_actions": ["排序: 最新发布", "更多筛选", "日期: 最近一周"],
-      "candidate_url_pattern": "/video/BV<id>",
-      "available_fields": ["title", "author", "plays", "danmaku", "duration", "publish_date", "video_url"],
-      "status": "verified"
-    },
     "youtube": {
       "name": "YouTube",
       "entry": "https://www.youtube.com/results?search_query={keyword}",
