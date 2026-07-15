@@ -67,3 +67,5 @@ output/
 outputs/
 results/
 tmp/
+cookies_*.txt
+.playwright-mcp/

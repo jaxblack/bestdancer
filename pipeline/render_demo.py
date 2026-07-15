@@ -177,9 +177,9 @@ def build_segments(cfg: dict) -> list[dict]:
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
             "title": cand.get("dance_type", "街舞"),
             "creator": clean(cand.get("creator", "")),
-            "cap": cand.get("dance_type", "街舞") + "   " + clean(cand.get("creator", "")),
+            "cap": "",
             "tip": "",
-            "subtitles": [cand.get("dance_type", "街舞") + "   " + clean(cand.get("creator", ""))],
+            "subtitles": [],
             "vo_caption": re.sub(r"[，。！？、,\.!\?]+", " ", full_vo).strip(),
         })
 
@@ -291,7 +291,7 @@ def render_overlay(seg) -> Image.Image:
     # 底部面板（与顶部同高）
     d.rounded_rectangle([-40, H - 232, W + 40, H + 40], radius=26, fill=(8, 8, 16, 168))
     chips_row(d, seg["moves"], H - 216)
-    subtitles = seg.get("subtitles") or [seg["cap"]]
+    subtitles = [text for text in seg.get("subtitles", []) if text]
     y = H - 158
     for i, text in enumerate(subtitles[:3]):
         font = F_SUB if i == 0 else F_SMALL
@@ -464,6 +464,13 @@ def main() -> int:
     if not cfg_path.exists():
         cfg_path = cfg_dir / f"{args.week}.example.json"
     cfg = json.loads(cfg_path.read_text("utf-8"))
+    selected_clip_ids = [pick.get("id") for pick in cfg.get("picks", []) if pick.get("id")]
+    classic_id = cfg.get("classic_comeback", {}).get("id")
+    if classic_id:
+        selected_clip_ids.append(classic_id)
+    missing_clips = [candidate_id for candidate_id in selected_clip_ids if not find_clip(args.week, candidate_id)]
+    if missing_clips:
+        raise SystemExit("入选舞段尚未下载，拒绝渲染占位成片: " + ", ".join(missing_clips))
     segs = build_segments(cfg)
 
     # ---- 文案 review 输出（控制台 + 文本文件）----

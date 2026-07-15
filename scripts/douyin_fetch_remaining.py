@@ -12,7 +12,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36")
 
 # Parse KEEP ids from log
-log = Path("/tmp/fetch4.log").read_text()
+log = Path("/tmp/w29_run.log").read_text()
 keep_ids = []
 for line in log.split("\n"):
     m = re.match(r'^\[\d+\] (\d+) [\d.]+s .* KEEP', line)

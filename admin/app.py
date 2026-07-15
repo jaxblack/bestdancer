@@ -128,6 +128,13 @@ def selected_ids(config: dict) -> list[str]:
     classic = config.get("classic_comeback", {}).get("id")
     return top + ([classic] if classic else [])
 
+def missing_selected_clips(config: dict) -> list[str]:
+    candidates = config.get("this_week_candidates", []) + config.get("classics_pool", [])
+    by_id = {candidate.get("id"): candidate for candidate in candidates}
+    return [candidate_id for candidate_id in selected_ids(config)
+            if not by_id.get(candidate_id, {}).get("local_path")
+            or not (REPO / by_id[candidate_id]["local_path"]).is_file()]
+
 
 def default_narration(item: dict, rank: int | None = None, classic: bool = False) -> str:
     creator = str(item.get("creator", "")).lstrip("@") or "这位编舞者"
@@ -462,16 +469,29 @@ class App(SimpleHTTPRequestHandler):
                     config = load_config(week)
                     candidates = {candidate.get("id"): candidate for candidate in config.get("this_week_candidates", [])}
                     candidates.update({candidate.get("id"): candidate for candidate in config.get("classics_pool", [])})
-                    video_ids = []
-                    for candidate_id in selected_ids(config):
-                        match = re.search(r"/video/(\d+)", candidates.get(candidate_id, {}).get("url", ""))
-                        if match:
-                            video_ids.append(match.group(1))
-                    if not video_ids:
-                        raise ValueError("请先在候选池细筛并保存至少一支抖音视频")
-                    cmd = [PYTHON_COMMAND, "scripts/douyin_fetch_clean.py", "--mode", "download", "--week", week,
-                           "--ids", "|".join(video_ids)]
+                    selected = selected_ids(config)
+                    xiaohongshu_ids = [candidate_id for candidate_id in selected
+                                       if candidates.get(candidate_id, {}).get("source") == "小红书"]
+                    if xiaohongshu_ids:
+                        if len(xiaohongshu_ids) != len(selected):
+                            raise ValueError("请按单一平台下载本期入选舞段")
+                        cmd = [PYTHON_COMMAND, "scripts/xiaohongshu_download.py", "--week", week,
+                               "--ids", "|".join(xiaohongshu_ids)]
+                    else:
+                        video_ids = []
+                        for candidate_id in selected:
+                            match = re.search(r"/video/(\d+)", candidates.get(candidate_id, {}).get("url", ""))
+                            if match:
+                                video_ids.append(match.group(1))
+                        if not video_ids:
+                            raise ValueError("请先在候选池细筛并保存至少一支抖音视频")
+                        cmd = [PYTHON_COMMAND, "scripts/douyin_fetch_clean.py", "--mode", "download", "--week", week,
+                               "--ids", "|".join(video_ids)]
                 elif action == "render":
+                    config = load_config(week)
+                    missing = missing_selected_clips(config)
+                    if missing:
+                        raise ValueError("入选舞段尚未下载，不能渲染占位成片: " + ", ".join(missing))
                     cmd = [PYTHON_COMMAND, "pipeline/render_demo.py", week]
                 else:
                     raise ValueError("Unsupported action")

@@ -21,7 +21,7 @@ parser.add_argument("--mode", choices=("discover", "download"), default="discove
 parser.add_argument("--source", choices=("follow", "search"), default="follow",
                     help="Discover from the followed feed or keyword search")
 parser.add_argument("--top", type=int, default=30, help="Number of ranked candidates to retain")
-parser.add_argument("--recent-days", type=int, default=7, help="Maximum candidate age for discovery")
+parser.add_argument("--recent-days", type=int, default=90, help="Maximum candidate age for discovery")
 parser.add_argument("--ids", default="", help="Pipe-separated Douyin video IDs selected for download")
 args = parser.parse_args()
 
@@ -236,27 +236,41 @@ with sync_playwright() as p:
     visit_count = min(len(all_ids), max(args.top * 3, 40))
     print(f"\n=== visiting {visit_count} video pages to grab metadata ===", flush=True)
     good = []
+    consecutive_fail = 0
     for i, vid in enumerate(all_ids[:visit_count], 1):
         vurl = f"https://www.douyin.com/video/{vid}"
-        try:
-            # navigate + concurrently wait for aweme/detail response
-            with page.expect_response(
-                lambda r, v=vid: "/aweme/v1/web/aweme/detail/" in r.url and v in r.url,
-                timeout=12000
-            ):
-                try:
-                    page.goto(vurl, wait_until="commit", timeout=12000)
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"[{i:02d}] {vid} no-detail ({type(e).__name__})", flush=True)
-            continue
-        # give handler a beat to parse
-        time.sleep(0.4)
-        d = captured.get(vid)
+        d = None
+        for attempt in (1, 2):
+            try:
+                with page.expect_response(
+                    lambda r, v=vid: "/aweme/v1/web/aweme/detail/" in r.url and v in r.url,
+                    timeout=15000
+                ):
+                    try:
+                        page.goto(vurl, wait_until="commit", timeout=15000)
+                    except Exception:
+                        pass
+            except Exception as e:
+                if attempt == 2:
+                    print(f"[{i:02d}] {vid} no-detail ({type(e).__name__})", flush=True)
+                continue
+            # give handler a beat to parse; poll up to 2s
+            for _ in range(10):
+                d = captured.get(vid)
+                if d:
+                    break
+                time.sleep(0.2)
+            if d:
+                break
         if not d:
-            print(f"[{i:02d}] {vid} no-detail-parsed", flush=True)
+            consecutive_fail += 1
+            print(f"[{i:02d}] {vid} no-detail-parsed (consec={consecutive_fail})", flush=True)
+            # 若连续 5 次都拦不到，浏览器/CDP 卡住，直接跳出（避免死循环等待）
+            if consecutive_fail >= 5:
+                print("  [!] 5 consecutive no-detail-parsed, aborting detail phase early", flush=True)
+                break
             continue
+        consecutive_fail = 0
         full_text = d["desc"] + " " + " ".join(d["tags"])
         excl = should_exclude(full_text)
         dur = d["duration_sec"]

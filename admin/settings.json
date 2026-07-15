@@ -1,14 +1,16 @@
 {
   "keywords": [
-    "urban dance 编舞",
-    "编舞 完整",
-    "kpop dance cover"
+    "urban",
+    "dance",
+    "编舞",
+    "kpop",
+    "hiphop"
   ],
   "platforms": [
     "douyin",
+    "xiaohongshu",
     "instagram",
-    "tiktok",
-    "xiaohongshu"
+    "tiktok"
   ],
   "top_limit": 10,
   "min_likes": 0,

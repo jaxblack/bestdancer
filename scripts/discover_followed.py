@@ -20,7 +20,7 @@ parser.add_argument("--top", type=int, default=30)
 parser.add_argument("--backup-limit", type=int, default=10)
 parser.add_argument("--min-likes", type=int, default=0)
 parser.add_argument("--videos-only", action="store_true")
-parser.add_argument("--recent-days", type=int, default=7)
+parser.add_argument("--recent-days", type=int, default=90)
 parser.add_argument("--sort", choices=["heat_desc"], default="heat_desc")
 args = parser.parse_args()
 
@@ -280,16 +280,40 @@ def search_candidates(context, platform: str, source: str, search_url) -> list[d
         result_page.close()
         detail_page.close()
 
+import signal
+
+# 每个平台的硬超时（秒）。任何平台超时后 fallback 到空结果，不阻塞其他平台。
+PLATFORM_TIMEOUT = {"xiaohongshu": 120, "tiktok": 120, "instagram": 120, "youtube": 120}
+
+class PlatformTimeout(Exception):
+    pass
+
+def _alarm_handler(signum, frame):
+    raise PlatformTimeout()
+
+signal.signal(signal.SIGALRM, _alarm_handler)
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.connect_over_cdp("http://127.0.0.1:9222")
     context = browser.contexts[0]
+    # 设置默认页面超时，避免单次 goto/locator 卡死
+    context.set_default_timeout(20000)
+    context.set_default_navigation_timeout(30000)
     for platform in other_platforms:
         source, search_url = SEARCHES[platform]
         print(f"=== {source}: keyword search ===", flush=True)
+        timeout = PLATFORM_TIMEOUT.get(platform, 120)
+        signal.alarm(timeout)
         try:
             items = search_candidates(context, platform, source, search_url)
+            signal.alarm(0)
             write_candidates(platform, items)
             print(f"  saved {len(items)} filtered candidates", flush=True)
+        except PlatformTimeout:
+            signal.alarm(0)
+            write_candidates(platform, [])
+            print(f"  failed: TimeoutError (>{timeout}s), skipping platform", flush=True)
         except Exception as error:  # noqa: BLE001
+            signal.alarm(0)
             write_candidates(platform, [])
             print(f"  failed: {type(error).__name__}: {error}", flush=True)
