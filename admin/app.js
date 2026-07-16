@@ -274,10 +274,10 @@ function buildVideoDescription() {
   if (!ranked.length) return `${week}热舞又来啦！先在候选池勾选并排好本期视频，再生成排行榜。`;
   const list = ranked.map((item, index) => {
     const prefix = index < 5 ? `${index + 1}.` : "特别加映：";
-    const title = item.title ? `《${item.title.replace(/[《》]/g, "")}》` : item.dance_type || "本周编舞";
     const creator = item.creator || "原作者待补充";
-    return `${prefix} ${title} · ${creator}\n来源：${item.source || "待补充"} · 点赞：${number(item.like)} · 观看：${number(item.play)}\n${item.url || "原链接待补充"}`;
-  }).join("\n\n");
+    const url = item.url || "原链接待补充";
+    return `${prefix} ${creator}  ${url}`;
+  }).join("\n");
   return `${week}热舞又来啦！这周的编舞里，有没有一支让你忍不住想跟跳？\n\n本期排行榜：\n${list}\n\n#热舞榜 #编舞 #街舞 #BestDancer`;
 }
 function selectedPlatforms() { return [...document.querySelectorAll(".platform:checked")].map((input) => input.value); }
