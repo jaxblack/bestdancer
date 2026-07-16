@@ -2336,7 +2336,7 @@
       "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
-        "stars": 4,
+        "stars": 3,
         "fit": "Urban",
         "scores": {}
       }
@@ -2497,7 +2497,7 @@
     {
       "segment": "classic",
       "rank": null,
-      "vo": "特别加映，Urban，来自 梦帆帆。",
+      "vo": "特别加映，Urban街舞Lucifer，来自 梦帆帆。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
@@ -2513,7 +2513,22 @@
   ],
   "metadata": {
     "source": "cross-platform dance urban/hiphop filtered",
-    "video_description": "2026 年第30周上部热舞又来啦！这周的编舞里，有没有一支让你忍不住想跟跳？\n\n本期排行榜：\n1. 《Lucifer》 · 原作者待补充\n来源：抖音 · 点赞：0 · 观看：0\nhttps://v.douyin.com/0GTKvCBEXP4/\n\n2. 《获赞最多》 · @layla_.mckenzie\n来源：TikTok · 点赞：472,400 · 观看：0\nhttps://www.tiktok.com/@layla_.mckenzie/video/7595264953888689439\n\n3. 《夏天来了 可以叮叮当了 #抖音潮流舞蹈大赛 #NNUNA #叮叮当当舞 - NNUNA于20260713发布在抖音，已经收获了2581.4万个喜欢，来抖音，记录美好生活！》 · @NNUNA\n来源：抖音 · 点赞：349,000 · 观看：0\nhttps://www.douyin.com/video/7661965411726624625\n\n4. 《#芬达编舞 #ineedagirl #taeyang #gdragon #choreography》 · @vivacious.dc\n来源：TikTok · 点赞：216,400 · 观看：0\nhttps://www.tiktok.com/@vivacious.dc/video/7649047033432640785\n\n5. 《更新一下帅舞😎 #danceCover#dance#urban#choreography》 · @theeyeflash999\n来源：TikTok · 点赞：2,209 · 观看：49,300\nhttps://www.tiktok.com/@theeyeflash999/video/7595981588140166431\n\n特别加映： 《更新一下帅舞😎 #danceCover#dance#urban#choreography》 · @theeyeflash999\n来源：TikTok · 点赞：2,209 · 观看：49,300\nhttps://www.tiktok.com/@theeyeflash999/video/7595981588140166431\n\n特别加映： 《Urban Dance》 · @barbimartinezsok\n来源：TikTok · 点赞：64,000 · 观看：0\nhttps://www.tiktok.com/@barbimartinezsok/video/7641435859601886484\n\n#热舞榜 #编舞 #街舞 #BestDancer"
+    "video_description": "2026 年第30周上部热舞又来啦！这周的编舞里，有没有一支让你忍不住想跟跳？\n\n本期排行榜：\n1. 《Lucifer》 · 原作者待补充\n来源：抖音 · 点赞：0 · 观看：0\nhttps://v.douyin.com/0GTKvCBEXP4/\n\n2. 《获赞最多》 · @layla_.mckenzie\n来源：TikTok · 点赞：472,400 · 观看：0\nhttps://www.tiktok.com/@layla_.mckenzie/video/7595264953888689439\n\n3. 《夏天来了 可以叮叮当了 #抖音潮流舞蹈大赛 #NNUNA #叮叮当当舞 - NNUNA于20260713发布在抖音，已经收获了2581.4万个喜欢，来抖音，记录美好生活！》 · @NNUNA\n来源：抖音 · 点赞：349,000 · 观看：0\nhttps://www.douyin.com/video/7661965411726624625\n\n4. 《#芬达编舞 #ineedagirl #taeyang #gdragon #choreography》 · @vivacious.dc\n来源：TikTok · 点赞：216,400 · 观看：0\nhttps://www.tiktok.com/@vivacious.dc/video/7649047033432640785\n\n5. 《更新一下帅舞😎 #danceCover#dance#urban#choreography》 · @theeyeflash999\n来源：TikTok · 点赞：2,209 · 观看：49,300\nhttps://www.tiktok.com/@theeyeflash999/video/7595981588140166431\n\n特别加映： 《更新一下帅舞😎 #danceCover#dance#urban#choreography》 · @theeyeflash999\n来源：TikTok · 点赞：2,209 · 观看：49,300\nhttps://www.tiktok.com/@theeyeflash999/video/7595981588140166431\n\n特别加映： 《Urban Dance》 · @barbimartinezsok\n来源：TikTok · 点赞：64,000 · 观看：0\nhttps://www.tiktok.com/@barbimartinezsok/video/7641435859601886484\n\n#热舞榜 #编舞 #街舞 #BestDancer",
+    "intro": {
+      "title1": "本周热舞",
+      "title2": "WEEKLY DANCE",
+      "foot": "TOP5 + 特别加映",
+      "vo": "本周热舞榜，五支正片，加一支特别加映。"
+    },
+    "outro": {
+      "title1": "关注追更",
+      "sub": "下周同一时间见",
+      "vo": "你最喜欢哪一支？评论区见。"
+    },
+    "global_voice": "zh-CN-XiaoyiNeural",
+    "global_voice_rate": "+20%",
+    "vo_template": "第{rank}名，{dance_type}街舞{title}，来自 {creator}。",
+    "vo_template_classic": "特别加映，{dance_type}街舞{title}，来自 {creator}。"
   },
   "deleted_ids": [
     "6916931059133320450",

@@ -135,7 +135,8 @@ function matchesCandidateFilters(item, filters) {
 function renderCandidates() {
   const list = $("#candidate-list"); list.replaceChildren();
   const raw = [...(state.config.this_week_candidates || []), ...(state.config.classics_pool || [])]
-    .filter((item) => !(typeof deletedCandidateIds !== "undefined" && deletedCandidateIds.has && deletedCandidateIds.has(item.id)));
+    .filter((item) => !(typeof deletedCandidateIds !== "undefined" && deletedCandidateIds.has && deletedCandidateIds.has(item.id)))
+    .map((item) => { const e = editBuffer.get(item.id); return e ? { ...item, ...e } : item; });
   populateCandidatePlatforms(raw);
   const filters = candidateFilters();
   const filtered = raw.filter((item) => matchesCandidateFilters(item, filters));
@@ -367,23 +368,27 @@ $("#generate-description").onclick=()=>{$("#video-description").value=buildVideo
 $("#copy-description").onclick=async()=>{const text=$("#video-description").value.trim(); if(!text)return; await navigator.clipboard.writeText(text); $("#status").textContent="视频简介已复制";};
 document.getElementById("save-global")?.addEventListener("click", saveConfig);
 document.getElementById("regen-vo")?.addEventListener("click", () => {
-  collectVisibleEdits();
   const tpl = $("#vo-tpl")?.value.trim() || "第{rank}名，{dance_type}街舞{title}，来自 {creator}。";
   const tplC = $("#vo-tpl-classic")?.value.trim() || "特别加映，{dance_type}街舞{title}，来自 {creator}。";
   const topIds = selectedOrder.filter(id => !specialIds.has(id)).slice(0, 5);
   const spId = [...specialIds][0];
-  const byId = new Map(candidates().map(c => [c.id, c]));
+  // 直接从 state.config 拿最新数据（不通过 candidates()，避免它内部 collectVisibleEdits 把 DOM 旧值再写回）
+  const all = [...(state.config.this_week_candidates || []), ...(state.config.classics_pool || [])];
+  const byId = new Map(all.map(c => [c.id, editBuffer.get(c.id) || c]));
   const fmt = (t, o) => t.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? "");
   let n = 0;
+  const upd = (id, vo) => {
+    const src = byId.get(id) || {};
+    const buf = { ...src, narration: vo };
+    editBuffer.set(id, buf); n++;
+  };
   topIds.forEach((id, i) => {
     const c = byId.get(id); if (!c) return;
-    const vo = fmt(tpl, { rank: i+1, dance_type: c.dance_type || "街舞", title: (c.song || c.title || "").replace(/[《》]/g, "").trim(), creator: (c.creator || "").replace(/^@/, "") });
-    const buf = editBuffer.get(id) || { ...c }; buf.narration = vo; editBuffer.set(id, buf); n++;
+    upd(id, fmt(tpl, { rank: i+1, dance_type: c.dance_type || "街舞", title: (c.song || c.title || "").replace(/[《》]/g, "").trim(), creator: (c.creator || "").replace(/^@/, "") }));
   });
   if (spId) {
     const c = byId.get(spId);
-    if (c) { const vo = fmt(tplC, { dance_type: c.dance_type || "街舞", title: (c.song || c.title || "").replace(/[《》]/g, "").trim(), creator: (c.creator || "").replace(/^@/, "") });
-      const buf = editBuffer.get(spId) || { ...c }; buf.narration = vo; editBuffer.set(spId, buf); n++; }
+    if (c) upd(spId, fmt(tplC, { dance_type: c.dance_type || "街舞", title: (c.song || c.title || "").replace(/[《》]/g, "").trim(), creator: (c.creator || "").replace(/^@/, "") }));
   }
   renderCandidates();
   $("#status").textContent = `已按模板重新生成 ${n} 支入选口播，记得点保存`;
