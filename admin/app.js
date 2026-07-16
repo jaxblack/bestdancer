@@ -31,6 +31,7 @@ function collectVisibleEdits() {
       download_status: row.dataset.downloadStatus || "unknown",
       candidate_tier: row.dataset.candidateTier || "top",
       chosen: row.querySelector(".chosen").checked,
+      is_special: row.querySelector(".is-special")?.checked || false,
       order: Number(row.querySelector(".order").value || 999),
       dance_type: row.querySelector(".dance-type").value.trim(),
       title: row.querySelector(".title").value.trim(),
@@ -137,7 +138,10 @@ function renderCandidates() {
     const row = $("#candidate-template").content.firstElementChild.cloneNode(true);
     row.dataset.id=item.id;
     if (selectedOrder.includes(item.id)) row.classList.add("is-chosen"); row.dataset.source=item.source || "抖音"; row.dataset.duration=item.duration_sec || 0; row.dataset.like=item.like || 0; row.dataset.play=item.play || 0; row.dataset.tags=JSON.stringify(item.tags || []); row.dataset.url=item.url || ""; row.dataset.localPath=item.local_path || ""; row.dataset.note=item.manual_note || ""; row.dataset.sourceDesc=item.source_desc || ""; row.dataset.downloadStatus=item.download_status || "unknown"; row.dataset.candidateTier=item.candidate_tier || "top";
-    row.querySelector(".chosen").checked=selectedOrder.includes(item.id); row.querySelector(".heat").innerHTML=`<small>点赞</small> ${number(item.like)} <small>观看</small> ${number(item.play)}`;
+    row.querySelector(".chosen").checked=selectedOrder.includes(item.id);
+    const specialCb = row.querySelector(".is-special");
+    if (specialCb) specialCb.checked = (editBuffer.get(item.id)?.is_special) ?? item.is_special ?? false;
+    row.querySelector(".heat").innerHTML=`<small>点赞</small> ${number(item.like)} <small>观看</small> ${number(item.play)}`;
     const status = document.createElement("span"); status.className=`download ${row.dataset.downloadStatus}`; status.textContent={ready:"可下载",downloaded:"已下载",unavailable:"不可下载",failed:"下载失败",link_only:"已采集链接"}[row.dataset.downloadStatus] || "待检测"; row.querySelector(".download-cell").append(status);
     const tier = document.createElement("span"); tier.className=`candidate-tier ${row.dataset.candidateTier}`; tier.textContent=row.dataset.candidateTier === "backup" ? "备选" : "TOP10"; row.querySelector(".heat").before(tier);
     const source = document.createElement("span"); source.className="source-platform"; source.textContent=`来源：${item.source || "待补充"}`; row.querySelector(".heat").before(source);
@@ -206,7 +210,7 @@ function renderCandidates() {
   bar.querySelector(".pg-input").onkeydown = (event) => { if (event.key === "Enter") jump(); };
   list.append(bar);
 }
-function payload() { return { week: $("#week").value, episode: { week: $("#week").value }, candidates: candidates(), selected: selected().slice(0,6), video_description: $("#video-description").value.trim() }; }
+function payload() { return { week: $("#week").value, episode: { week: $("#week").value }, candidates: candidates(), selected: selected().slice(0,6), special_ids: candidates().filter(c => c.is_special).map(c => c.id), video_description: $("#video-description").value.trim() }; }
 function buildVideoDescription() {
   const all = new Map(candidates().map((item) => [item.id, item]));
   const ranked = selected().map((id) => all.get(id)).filter(Boolean);

@@ -199,8 +199,13 @@ def build_editor_config(week: str, payload: dict) -> dict:
     repeated = [url for url in selected_urls if url and (url in duplicates or selected_urls.count(url) > 1)]
     if repeated:
         raise ValueError("本期入选含有往期或本期重复视频，请更换候选")
+    # 用户勾选的 "is_special" 优先：它单独进 classic segment；其余按 order 1..N = TOP1..N
+    special_ids = set(payload.get("special_ids", []))
+    top_ids = [cid for cid in selected if cid not in special_ids][:5]
+    special_id = next((cid for cid in selected if cid in special_ids and cid in candidates), None)
+
     picks, narration = [], []
-    for rank, candidate_id in enumerate(selected[:5], 1):
+    for rank, candidate_id in enumerate(top_ids, 1):
         item = candidates.get(candidate_id)
         if not item:
             continue
@@ -212,7 +217,7 @@ def build_editor_config(week: str, payload: dict) -> dict:
                   "voice_rate": item.get("voice_rate", "+20%"), "subtitle": [],
                           "on_screen": {"stars": difficulty.get("stars", 3.0), "tag": f"本周No.{rank}",
                                         "core_moves": [item["dance_type"]]}, "beginner_tip": ""})
-    classic_id = selected[5] if len(selected) > 5 and selected[5] in candidates else None
+    classic_id = special_id
     classic_pool = [candidates.pop(classic_id)] if classic_id else []
     classic = {}
     if classic_id:

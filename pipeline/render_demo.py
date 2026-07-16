@@ -47,7 +47,9 @@ GRAY = (165, 165, 180)
 VOICE = os.environ.get("TTS_VOICE", "zh-CN-XiaoyiNeural")   # 晓伊：活泼年轻女声
 RATE = os.environ.get("TTS_RATE", "+18%")                   # 提速，去掉拖沓 AI 味
 TAIL = 3.0                                                  # 结尾纯 BGM 时长
-BGM_PATH = REPO / "assets" / "bgm" / "auto_beat.wav"
+BGM_DIR = REPO / "assets" / "bgm"
+BGM_PATH = BGM_DIR / "ayo_jason_nevins_remix.mp3"
+FALLBACK_BGM_PATH = BGM_DIR / "auto_beat.wav"
 sys.path.insert(0, str(Path(__file__).parent))
 
 
@@ -178,6 +180,8 @@ def build_segments(cfg: dict) -> list[dict]:
             "title": cand.get("dance_type", "街舞"),
             "creator": clean(cand.get("creator", "")),
             "source": clean(cand.get("source", "")),
+            "like": cand.get("like", 0),
+            "play": cand.get("play", 0),
             "cap": "",
             "tip": "",
             "subtitles": [],
@@ -278,7 +282,19 @@ def render_overlay(seg) -> Image.Image:
     byline = " ".join(p for p in byline_parts if p)
     if byline:
         d.text((W / 2, 162), byline, font=F_SMALL, fill=GRAY, anchor="mm")
-    draw_stars(img, d, W / 2, 204, seg["stars"])
+    # 观看/点赞 用「万」精度；缺失就不写
+    def _wan(n):
+        try: n = int(n or 0)
+        except Exception: return ""
+        if n < 10000: return ""
+        return f"{n // 10000}万"
+    stats = []
+    like_s = _wan(seg.get("like"));  play_s = _wan(seg.get("play"))
+    if play_s: stats.append(f"播放 {play_s}")
+    if like_s: stats.append(f"点赞 {like_s}")
+    if stats:
+        d.text((W / 2, 186), "  ".join(stats), font=F_SMALL, fill=CA, anchor="mm")
+    draw_stars(img, d, W / 2, 220, seg["stars"])
     # 中部 AI 口播大字幕（半透明黑底 + 大白字）
     vo_cap = seg.get("vo_caption", "")
     if vo_cap:
@@ -388,10 +404,12 @@ def concat_wavs(files, out, target_durs=None):
 
 
 def ensure_bgm():
-    if not BGM_PATH.exists():
+    if BGM_PATH.exists():
+        return BGM_PATH
+    if not FALLBACK_BGM_PATH.exists():
         import make_bgm
-        make_bgm.generate(BGM_PATH)
-    return BGM_PATH
+        make_bgm.generate(FALLBACK_BGM_PATH)
+    return FALLBACK_BGM_PATH
 
 
 def seg_bed(entry, i, dur, tmp, ff, bgm):
