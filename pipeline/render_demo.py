@@ -142,9 +142,20 @@ def build_segments(cfg: dict) -> list[dict]:
     tpl = meta.get("vo_template") or "第{rank}名，{dance_type}街舞{title}，来自 {creator}。"
     tpl_classic = meta.get("vo_template_classic") or "特别加映，{dance_type}街舞{title}，来自 {creator}。"
 
+    # 支持 {year} {week} {edition} 变量: 2026-W30-A → year=26 week=30 edition=上
+    _wk = ep.get("week", "") or ""
+    import re as _re
+    _m = _re.match(r"(\d{4})-W(\d{1,2})(?:-([AB]))?", _wk)
+    if _m:
+        _yr = _m.group(1)[-2:]; _wn = int(_m.group(2)); _ed = {"A":"上","B":"下"}.get(_m.group(3) or "", "")
+    else:
+        _yr = ""; _wn = ""; _ed = ""
+    _intro_vo_default = f"{_yr}年第{_wn}周热舞榜，{_ed}" if _yr else "本周热舞榜"
+    _intro_vo = (intro_cfg.get("vo") or "").format(year=_yr, week=_wn, edition=_ed) if intro_cfg.get("vo") else _intro_vo_default
+
     segs = [{
         "type": "intro", "cid": None,
-        "vo": intro_cfg.get("vo") or "本周热舞榜，五支正片，加一支特别加映。",
+        "vo": _intro_vo,
         "title1": intro_cfg.get("title1") or "本周热舞",
         "title2": intro_cfg.get("title2") or "WEEKLY DANCE",
         "sub": clean(ep.get("theme", "")), "week": ep.get("week", ""),

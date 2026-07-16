@@ -366,6 +366,28 @@ $("#week").onchange=load; $("#edition").onchange=setEdition; $("#workspace-range
 $("#generate-description").onclick=()=>{$("#video-description").value=buildVideoDescription(); $("#status").textContent="已按本期顺序生成视频简介";};
 $("#copy-description").onclick=async()=>{const text=$("#video-description").value.trim(); if(!text)return; await navigator.clipboard.writeText(text); $("#status").textContent="视频简介已复制";};
 document.getElementById("save-global")?.addEventListener("click", saveConfig);
+document.getElementById("regen-vo")?.addEventListener("click", () => {
+  collectVisibleEdits();
+  const tpl = $("#vo-tpl")?.value.trim() || "第{rank}名，{dance_type}街舞{title}，来自 {creator}。";
+  const tplC = $("#vo-tpl-classic")?.value.trim() || "特别加映，{dance_type}街舞{title}，来自 {creator}。";
+  const topIds = selectedOrder.filter(id => !specialIds.has(id)).slice(0, 5);
+  const spId = [...specialIds][0];
+  const byId = new Map(candidates().map(c => [c.id, c]));
+  const fmt = (t, o) => t.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? "");
+  let n = 0;
+  topIds.forEach((id, i) => {
+    const c = byId.get(id); if (!c) return;
+    const vo = fmt(tpl, { rank: i+1, dance_type: c.dance_type || "街舞", title: (c.song || c.title || "").replace(/[《》]/g, "").trim(), creator: (c.creator || "").replace(/^@/, "") });
+    const buf = editBuffer.get(id) || { ...c }; buf.narration = vo; editBuffer.set(id, buf); n++;
+  });
+  if (spId) {
+    const c = byId.get(spId);
+    if (c) { const vo = fmt(tplC, { dance_type: c.dance_type || "街舞", title: (c.song || c.title || "").replace(/[《》]/g, "").trim(), creator: (c.creator || "").replace(/^@/, "") });
+      const buf = editBuffer.get(spId) || { ...c }; buf.narration = vo; editBuffer.set(spId, buf); n++; }
+  }
+  renderCandidates();
+  $("#status").textContent = `已按模板重新生成 ${n} 支入选口播，记得点保存`;
+});
 $("#platform-all").onchange=(event)=>{document.querySelectorAll(".platform").forEach((input)=>{input.checked=event.target.checked;});};
 document.querySelectorAll(".platform").forEach((input)=>input.addEventListener("change",()=>{$("#platform-all").checked=selectedPlatforms().length===document.querySelectorAll(".platform").length;}));
 document.querySelectorAll("#candidate-platform, #candidate-query, #candidate-min-likes, #candidate-tier, #candidate-sort, #candidate-download, #candidate-selected").forEach((input) => input.addEventListener(input.type === "search" || input.type === "number" ? "input" : "change", () => { collectVisibleEdits(); currentPage = 1; renderCandidates(); }));
