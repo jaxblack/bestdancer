@@ -141,8 +141,8 @@
 .candidate-card-header {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid #e7e3d8;
   background: #f4f1e7;
   color: #11131a;
@@ -159,29 +159,31 @@
 
 .choose-control input { width: auto; accent-color: #ed276f; }
 .order-control input { width: 56px; padding: 5px 7px; }
-.candidate-card .heat { margin-left: auto; font-size: 15px; }
-.candidate-card .heat small { display: inline; margin-left: 6px; }
+.source-platform { padding: 3px 7px; border: 1px solid #dcd8ca; color: #494a48; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.candidate-card .heat { margin-left: auto; font-size: 15px; white-space: nowrap; }
+.candidate-card .heat small { display: inline; margin: 0 4px 0 8px; color: #73746e; font-size: 10px; font-weight: 800; }
+.candidate-card .heat small:first-child { margin-left: 0; }
 .candidate-card .source-link { margin-left: 4px; white-space: nowrap; }
 .candidate-tier { padding: 3px 7px; border: 1px solid #06a9b4; border-radius: 3px; color: #067b83; font-size: 10px; font-weight: 800; white-space: nowrap; }
 .candidate-tier.backup { border-color: #a4a095; color: #73746e; }
 
 .candidate-fields {
   display: grid;
-  grid-template-columns: 150px minmax(180px, 1fr) minmax(180px, 1fr) 100px;
-  gap: 14px;
-  padding: 16px;
+  grid-template-columns: 130px minmax(180px, 1fr) minmax(180px, 1fr) 90px;
+  gap: 10px 12px;
+  padding: 12px 14px;
 }
 
 .candidate-fields label,
 .submission-form label {
   display: grid;
-  gap: 7px;
+  gap: 4px;
   font-size: 12px;
   font-weight: 800;
 }
 
 .candidate-fields .narration-field { grid-column: 1 / -1; }
-.candidate-fields textarea { min-height: 112px; line-height: 1.55; resize: vertical; }
+.candidate-fields textarea { width: 100%; min-height: 64px; line-height: 1.5; resize: vertical; }
 
 .clip-controls,
 .voice-controls {
@@ -258,6 +260,9 @@
   .candidate-card-header { align-items: flex-start; flex-wrap: wrap; gap: 10px 14px; }
   .candidate-card .heat { margin-left: 0; }
   .candidate-fields { grid-template-columns: 1fr; }
+  .clip-voice-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .clip-voice-row label:has(.voice) { grid-column: 1 / -1; }
+  .clip-voice-row button { width: 100%; }
   .clip-controls,
   .voice-controls { align-items: stretch; }
   .clip-controls label,
@@ -265,4 +270,71 @@
   .clip-player,
   .voice-player { width: 100%; }
   .submission-panel { grid-template-columns: 1fr; gap: 20px; }
+}
+/* ── added: pagination + compact single-row clip+voice ── */
+.pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 16px; padding: 18px 12px; margin-top: 8px;
+  border-top: 1px solid rgba(120,120,120,0.15);
+}
+.pagination button {
+  padding: 6px 14px; cursor: pointer;
+}
+.pagination button[disabled] { opacity: 0.4; cursor: not-allowed; }
+.pagination .pg-info { font-size: 13px; opacity: 0.75; min-width: 220px; text-align: center; }
+
+.clip-voice-row {
+  display: grid; grid-column: 1 / -1;
+  grid-template-columns: 82px 82px minmax(160px, 1fr) 86px auto auto;
+  gap: 8px 10px; align-items: end;
+  padding: 9px 10px;
+  background: #f7f4ec; border: 1px solid #e7e3d8; border-radius: 4px;
+}
+.clip-voice-row label { display: flex; flex-direction: column; font-size: 11px; gap: 3px; min-width: 0; }
+.clip-voice-row input, .clip-voice-row select { padding: 4px 6px; font-size: 13px; }
+.clip-voice-row button { padding: 5px 10px; font-size: 12px; height: 30px; align-self: flex-end; }
+.clip-voice-row .clip-status, .clip-voice-row .voice-status { grid-column: auto; min-width: 0; padding: 0; font-size: 11px; }
+.clip-voice-row .clip-player, .clip-voice-row .voice-player { grid-column: 1 / -1; width: min(100%, 360px); margin-top: 2px; }
+
+/* compact overall candidate card */
+.candidate-card { padding: 0 !important; margin-bottom: 10px !important; }
+.candidate-card .narration { min-height: 60px; }
+.candidate-fields { gap: 8px 12px !important; }
+
+.candidate-filters { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: end; padding: 10px 12px; margin: 12px 0 4px; border: 1px solid #e1ddd1; background: #f7f4ec; }
+.candidate-filters label { display: grid; gap: 3px; color: #5f605c; font-size: 10px; font-weight: 800; }
+.candidate-filters select,
+.candidate-filters input { min-width: 100px; padding: 6px 8px; font-size: 12px; }
+.candidate-filters .candidate-keyword { flex: 1 1 210px; }
+.candidate-filters .candidate-keyword input { width: 100%; }
+.candidate-filters .candidate-selected { display: flex; gap: 6px; align-items: center; min-height: 32px; color: #11131a; font-size: 11px; white-space: nowrap; }
+.candidate-filters .candidate-selected input { min-width: 0; width: auto; accent-color: #ed276f; }
+.candidate-filters button { align-self: end; min-height: 32px; padding: 6px 10px; font-size: 12px; }
+
+.pagination .pg-jump { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.pagination .pg-input { width: 54px; padding: 5px 6px; text-align: center; }
+.pagination .pg-go { padding: 6px 10px; }
+.delete-candidate { border-color: #c65b58; color: #a2403f; padding: 5px 9px; font-size: 11px; white-space: nowrap; }
+.delete-candidate:hover { background: #fff0ef; }
+
+@media (max-width: 800px) {
+  .pagination { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+  .pagination .pg-info { min-width: 0; }
+  .candidate-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .candidate-filters .candidate-keyword { grid-column: 1 / -1; }
+  .candidate-filters select,
+  .candidate-filters input { min-width: 0; width: 100%; }
+}
+
+/* highlight chosen candidates pinned at top */
+.candidate-card.is-chosen {
+  border-left: 4px solid #ff4d8f !important;
+  background: rgba(255, 77, 143, 0.05) !important;
+}
+.candidate-card.is-chosen::before {
+  content: "✓ 已入选";
+  display: inline-block;
+  background: #ff4d8f; color: #fff;
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  margin-right: 8px;
 }

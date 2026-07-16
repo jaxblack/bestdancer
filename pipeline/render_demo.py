@@ -177,6 +177,7 @@ def build_segments(cfg: dict) -> list[dict]:
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
             "title": cand.get("dance_type", "街舞"),
             "creator": clean(cand.get("creator", "")),
+            "source": clean(cand.get("source", "")),
             "cap": "",
             "tip": "",
             "subtitles": [],
@@ -272,8 +273,11 @@ def render_overlay(seg) -> Image.Image:
     pill(d, W / 2, 34, seg["tag"], F_TAG, BG, tag_bg)
     for ln in wrap(d, seg["title"], F_TITLE, W - 2 * MARGIN)[:1]:
         d.text((W / 2, 116), ln, font=F_TITLE, fill=CA, anchor="mm")
-    if seg["creator"]:
-        d.text((W / 2, 162), "原创 " + seg["creator"], font=F_SMALL, fill=GRAY, anchor="mm")
+    # 「平台 空格 @作者」 无标点，符合用户偏好
+    byline_parts = [seg.get("source", "").strip(), seg.get("creator", "").strip()]
+    byline = " ".join(p for p in byline_parts if p)
+    if byline:
+        d.text((W / 2, 162), byline, font=F_SMALL, fill=GRAY, anchor="mm")
     draw_stars(img, d, W / 2, 204, seg["stars"])
     # 中部 AI 口播大字幕（半透明黑底 + 大白字）
     vo_cap = seg.get("vo_caption", "")

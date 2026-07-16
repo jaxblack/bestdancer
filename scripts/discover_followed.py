@@ -74,6 +74,11 @@ def compact_number(value: str) -> int:
     return int(number * {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000, "万": 10_000}.get(match.group(2).lower(), 1))
 
 
+def view_count(text: str) -> int:
+    match = re.search(r"([\d,.]+\s*[KMBkmb万]?)\s*(?:views?|观看|播放|浏览)", text, re.I)
+    return compact_number(match.group(1)) if match else 0
+
+
 def parse_published_date(value: str) -> date | None:
     value = value.strip()
     hours_match = re.fullmatch(r"(\d+)小时前", value)
@@ -118,6 +123,7 @@ def extract_detail(page, platform: str, url: str) -> dict:
         "source_desc": description[:1000],
         "creator": f"@{creator_match.group(1)}" if creator_match else "",
         "like": compact_number(likes_match.group(1)) if likes_match else 0,
+        "play_count": view_count(description),
         "is_video": is_video,
         "published_at": parse_published_date(published_match.group(1)) if published_match else None,
     }
@@ -138,7 +144,7 @@ def tiktok_cards(page) -> list[dict]:
         published_at = parse_published_date(lines[-1]) if lines else None
         if len(lines) < 4 or not published_at:
             continue
-        results.append({"url": card["url"], "like": compact_number(lines[0]), "title": lines[1][:120],
+        results.append({"url": card["url"], "like": compact_number(lines[0]), "play_count": view_count(card["text"]), "title": lines[1][:120],
                         "source_desc": lines[1], "creator": f"@{lines[2]}", "is_video": True,
                         "published_at": published_at})
     return results
@@ -166,7 +172,7 @@ def xiaohongshu_cards(page) -> list[dict]:
         if not lines or not published_at:
             continue
         results.append({"url": card["url"], "title": lines[0][:120], "source_desc": card["text"][:1000],
-                        "creator": lines[1] if len(lines) > 1 else "", "like": compact_number(lines[-1]),
+                "creator": lines[1] if len(lines) > 1 else "", "like": compact_number(lines[-1]), "play_count": view_count(card["text"]),
                         "is_video": True, "published_at": published_at})
     return results
 
@@ -198,7 +204,7 @@ def youtube_cards(page) -> list[dict]:
         lines = [line.strip() for line in card["text"].splitlines() if line.strip()]
         results.append({"url": card["url"], "title": card["title"][:120], "source_desc": card["text"][:1000],
                         "creator": card["creator"], "like": 0,
-                        "play_count": compact_number(next((line for line in lines if "views" in line.lower()), "")),
+                        "play_count": view_count(next((line for line in lines if "views" in line.lower()), "")),
                         "is_video": True, "published_at": date.today()})
     return results
 
@@ -266,7 +272,7 @@ def search_candidates(context, platform: str, source: str, search_url) -> list[d
             items.append({
                 "id": f"{platform}-{len(items) + 1}", "source": source, "url": href,
                 "title": details["title"] or "待人工补充", "source_desc": details["source_desc"],
-                "creator": details["creator"], "like": details["like"], "play_count": 0,
+                "creator": details["creator"], "like": details["like"], "play_count": details.get("play_count", 0),
                 "duration_sec": 0, "dance_type": "Urban", "download_status": "link_only",
                 "media_type": "video",
             })

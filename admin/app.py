@@ -95,13 +95,42 @@ def save_settings(settings: dict) -> None:
     )
 
 
+PLATFORM_TO_SOURCE = {
+    "douyin": "抖音", "xiaohongshu": "小红书", "tiktok": "TikTok",
+    "instagram": "Instagram", "youtube": "YouTube", "bilibili": "B站",
+}
+
+
+def _infer_source(item: dict) -> str:
+    if item.get("source"):
+        return item["source"]
+    plat = item.get("platform")
+    if plat and plat in PLATFORM_TO_SOURCE:
+        return PLATFORM_TO_SOURCE[plat]
+    url = item.get("url", "")
+    for key, label in PLATFORM_TO_SOURCE.items():
+        if key in url:
+            return label
+    return "抖音"
+
+
+def _infer_creator(item: dict) -> str:
+    c = item.get("creator")
+    if c: return c
+    a = item.get("author")
+    if a:
+        a = str(a).lstrip("@")
+        return "@" + a if a and a.lower() != "unknown" else ""
+    return ""
+
+
 def normalize_candidate(item: dict, index: int) -> dict:
     candidate_id = item.get("id") or f"c{index}"
     voice = item.get("voice", "zh-CN-XiaoyiNeural")
     return {
         "id": candidate_id,
-        "source": item.get("source", "抖音"),
-        "creator": item.get("creator", ""),
+        "source": _infer_source(item),
+        "creator": _infer_creator(item),
         "title": item.get("title", ""),
         "song": item.get("song", ""),
         "duration_sec": item.get("duration_sec") or 0,
@@ -224,6 +253,17 @@ def historical_urls(active_week: str) -> set[str]:
     return urls
 
 
+def candidate_items(value: object) -> list[dict]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        items = value.get("candidates")
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)]
+        return [value]
+    return []
+
+
 def import_downloads(week: str) -> dict:
     incoming = INCOMING / week
     base = incoming / "dl2"
@@ -232,7 +272,8 @@ def import_downloads(week: str) -> dict:
     historical = historical_urls(week)
     generic_candidates = incoming / "candidates"
     for candidate_path in sorted(generic_candidates.glob("*.json")):
-        for index, item in enumerate(json.loads(candidate_path.read_text(encoding="utf-8")), 1):
+        data = json.loads(candidate_path.read_text(encoding="utf-8"))
+        for index, item in enumerate(candidate_items(data), 1):
             url = item.get("url", "")
             if not url or item.get("media_type") not in {None, "video"}:
                 continue
@@ -265,16 +306,28 @@ def import_downloads(week: str) -> dict:
     for index, meta_path in enumerate(sorted(base.glob("*.json")), 1):
         item = json.loads(meta_path.read_text(encoding="utf-8"))
         video_id = str(item.get("id", meta_path.stem))
-        url = f"https://www.douyin.com/video/{video_id}"
+        plat = item.get("platform") or "douyin"
+        url = item.get("url") or {
+            "douyin":       f"https://www.douyin.com/video/{video_id}",
+            "xiaohongshu":  f"https://www.xiaohongshu.com/explore/{video_id}",
+            "tiktok":       f"https://www.tiktok.com/@_/video/{video_id}",
+            "instagram":    f"https://www.instagram.com/reel/{video_id}/",
+            "youtube":      f"https://www.youtube.com/watch?v={video_id}",
+            "bilibili":     f"https://www.bilibili.com/video/{video_id}",
+        }.get(plat, f"https://www.douyin.com/video/{video_id}")
         if canonical_url(url) in historical:
             continue
         normalized_url = canonical_url(url)
         current[normalized_url] = normalize_candidate({
-            "id": current.get(normalized_url, {}).get("id", f"c{index}"), "creator": "@" + item.get("author", ""),
-            "title": item.get("desc", "")[:60], "source_desc": item.get("desc", ""), "like": item.get("like", 0),
+            "id": current.get(normalized_url, {}).get("id", f"c{index}"),
+            "platform": plat,
+            "creator": "@" + item.get("author", ""),
+            "title": item.get("desc", "") or item.get("title", ""),
+            "source_desc": item.get("desc", "") or item.get("title", ""),
+            "like": item.get("like") or item.get("like_count", 0),
             "play": item.get("play_count", 0), "duration_sec": item.get("duration_sec", 0),
             "tags": item.get("tags", []), "url": url, "dance_type": item.get("dance_type", "街舞"),
-                "download_status": "downloaded",
+            "download_status": "downloaded",
             "local_path": str(meta_path.with_suffix(".mp4").relative_to(REPO)),
             "candidate_tier": "top" if index <= 10 else "backup",
         }, index)
