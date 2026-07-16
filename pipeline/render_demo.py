@@ -134,13 +134,21 @@ def build_segments(cfg: dict) -> list[dict]:
     picks = {p["rank"]: p for p in cfg.get("picks", [])}
     classic_id = cfg.get("classic_comeback", {}).get("id")
     ep = cfg.get("episode", {})
+    meta = cfg.get("metadata", {})
+    intro_cfg = meta.get("intro", {}) or {}
+    outro_cfg = meta.get("outro", {}) or {}
+    g_voice = meta.get("global_voice") or "zh-CN-XiaoyiNeural"
+    g_rate = meta.get("global_voice_rate") or "+20%"
+    tpl = meta.get("vo_template") or "第{rank}名，{dance_type}街舞{title}，来自 {creator}。"
+    tpl_classic = meta.get("vo_template_classic") or "特别加映，{dance_type}街舞{title}，来自 {creator}。"
 
     segs = [{
         "type": "intro", "cid": None,
-        "vo": "本周热舞榜，五支正片，加一支特别加映。",
-        "title1": "本周热舞", "title2": "WEEKLY DANCE",
+        "vo": intro_cfg.get("vo") or "本周热舞榜，五支正片，加一支特别加映。",
+        "title1": intro_cfg.get("title1") or "本周热舞",
+        "title2": intro_cfg.get("title2") or "WEEKLY DANCE",
         "sub": clean(ep.get("theme", "")), "week": ep.get("week", ""),
-        "foot": "TOP5 + 特别加映",
+        "foot": intro_cfg.get("foot") or "TOP5 + 特别加映",
     }]
 
     narration_items = sorted(
@@ -164,20 +172,32 @@ def build_segments(cfg: dict) -> list[dict]:
         fit = diff.get("fit", "")
         moves = osd.get("core_moves", [])
         move0 = moves[0] if moves else "核心动作"
-        default_vo = f"第{rank}名，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。" if top \
-                 else f"特别加映，{cand.get('dance_type', '街舞')}，来自 {cand.get('creator', '').lstrip('@')}。"
+        _dt = cand.get("dance_type", "").strip() or "街舞"
+        _creator = cand.get("creator", "").lstrip("@") or "编舞者"
+        _title = clean(cand.get("song") or cand.get("title") or "").strip("《》").strip()
+        _tpl = tpl if top else tpl_classic
+        default_vo = _tpl.format(rank=rank, dance_type=_dt, title=_title, creator=_creator)
+        # 全局音色 / 语速覆盖 candidate 级别（除非候选自己写了 vo 且没显式勾选跟随全局；简化：直接用全局）
+        _voice = g_voice
+        _rate = g_rate
         full_vo = first_sentences(sanitize_tts(item.get("vo", "")), 2) or default_vo
+        # 智能同步舞种词：把 vo 里所有旧舞种词/"街舞"替换成当前 dance_type
+        if _dt:
+            import re as _re
+            _pat = _re.compile(r"(Urban(?:\s*[Dd]ance)?|Hip[- ]?[Hh]op|Jazz|K[- ]?pop|Popping|Locking|嘻哈|爵士|韩舞|街舞)", _re.IGNORECASE)
+            full_vo = _pat.sub(_dt, full_vo)
+            full_vo = _re.sub(rf"({_re.escape(_dt)})(\s*{_re.escape(_dt)})+", r"\1", full_vo)
         if top:
             cap = f"{fit} · 重点练{move0}"
         else:
             cap = f"{fit} · 基本功打底必练"
         segs.append({
             "type": item.get("segment"), "cid": cid, "rank": rank, "vo": full_vo,
-            "voice": item.get("voice", VOICE), "voice_rate": item.get("voice_rate", RATE),
+            "voice": _voice, "voice_rate": _rate,
             "clip_start_sec": float(cand.get("clip_start_sec") or 0),
             "clip_end_sec": float(cand.get("clip_end_sec") or 0),
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
-            "title": cand.get("dance_type", "街舞"),
+            "title": clean(cand.get("song") or cand.get("title") or "").strip("《》") or cand.get("dance_type", "街舞"),
             "creator": clean(cand.get("creator", "")),
             "source": clean(cand.get("source", "")),
             "like": cand.get("like", 0),
@@ -189,8 +209,9 @@ def build_segments(cfg: dict) -> list[dict]:
         })
 
     segs.append({"type": "outro", "cid": None,
-                 "vo": "你最喜欢哪一支？评论区见。",
-                 "title1": "关注追更", "sub": "下周同一时间见"})
+                 "vo": outro_cfg.get("vo") or "你最喜欢哪一支？评论区见。",
+                 "title1": outro_cfg.get("title1") or "关注追更",
+                 "sub": outro_cfg.get("sub") or "下周同一时间见"})
     return segs
 
 

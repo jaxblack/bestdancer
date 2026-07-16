@@ -124,6 +124,72 @@ def _infer_creator(item: dict) -> str:
     return ""
 
 
+def parse_manual_submission(raw: str) -> dict:
+    """Extract url + metadata from a share-string like抖音分享文本.
+    Handles v.douyin.com short links (resolves via HEAD), tiktok, xhs, IG.
+    Extracts title, creator (@author or 《song》), platform, source label.
+    """
+    import re, urllib.request, urllib.error
+    out = {"url": "", "title": "", "creator": "", "author": "",
+           "source": "投稿", "platform": "douyin", "dance_type": "街舞"}
+    if not raw:
+        return out
+    # 1. find any URL in the blob
+    m = re.search(r"https?://[^\s，,()【】]+", raw)
+    url = m.group(0) if m else raw.strip()
+    # 2. resolve v.douyin.com/xxx short link to canonical /video/<id>
+    if "v.douyin.com" in url or "v.tiktok.com" in url or "xhslink.com" in url:
+        try:
+            req = urllib.request.Request(url, method="HEAD",
+                                         headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                url = resp.geturl() or url
+        except Exception:
+            pass  # keep short link
+    # strip TikTok/Douyin tracking params after canonical id
+    url = re.sub(r"[?#].*$", "", url)
+    out["url"] = url
+    # 3. platform + source
+    if "douyin.com" in url or "iesdouyin" in url:
+        out["platform"] = "douyin"; out["source"] = "抖音"
+    elif "tiktok.com" in url:
+        out["platform"] = "tiktok"; out["source"] = "TikTok"
+    elif "xiaohongshu.com" in url or "xhslink" in url:
+        out["platform"] = "xiaohongshu"; out["source"] = "小红书"
+    elif "instagram.com" in url:
+        out["platform"] = "instagram"; out["source"] = "Instagram"
+    elif "youtube.com" in url or "youtu.be" in url:
+        out["platform"] = "youtube"; out["source"] = "YouTube"
+    elif "bilibili.com" in url or "b23.tv" in url:
+        out["platform"] = "bilibili"; out["source"] = "B站"
+    # 4. extract song title 《X》
+    song = re.search(r"《([^》]+)》", raw)
+    if song: out["title"] = song.group(1).strip()
+    # 5. extract creator: @foo — 但排除掉分享码里的伪 handle (@x.y 跟着 :2pm 之类)
+    #    先剥掉链接和前面的分享码噪音块（形如 "8.92 jcA:/ 08/01 Q@k.pd :2pm"）
+    noise_stripped = re.sub(r"^\s*\S+\s+\S+:/[^\s]*\s+\S+\s+\S+\s+:\S+\s*", "", raw)
+    author = re.search(r"@([A-Za-z0-9_\u4e00-\u9fa5\-]{2,})(?![.:])", noise_stripped)
+    if author:
+        out["author"] = author.group(1)
+        out["creator"] = "@" + author.group(1)
+    # 6. fallback title = strip URL/hashtag/emoji noise then first sentence
+    if not out["title"]:
+        cleaned = re.sub(r"https?://\S+", "", raw)
+        cleaned = re.sub(r"#\S+", "", cleaned)
+        cleaned = re.sub(r"[0-9a-zA-Z:.\-@/]{5,}", "", cleaned)  # ID-like blobs
+        cleaned = re.sub(r"(复制此链接|打开Dou音|直接观看视频|请复制|保存|点开链接)", "", cleaned)
+        parts = re.split(r"[，,。\n]+", cleaned)
+        for p in parts:
+            p = p.strip()
+            if 3 <= len(p) <= 60:
+                out["title"] = p; break
+    # 7. dance_type inference from hashtags
+    for kw in ("Urban", "Hip-hop", "Jazz", "K-pop", "Popping", "Locking", "Waacking"):
+        if kw.lower() in raw.lower(): out["dance_type"] = kw; break
+    if "kpop" in raw.lower() or "k-pop" in raw.lower(): out["dance_type"] = "K-pop"
+    return out
+
+
 def normalize_candidate(item: dict, index: int) -> dict:
     candidate_id = item.get("id") or f"c{index}"
     voice = item.get("voice", "zh-CN-XiaoyiNeural")
@@ -149,6 +215,7 @@ def normalize_candidate(item: dict, index: int) -> dict:
         "source_desc": item.get("source_desc", ""),
         "download_status": item.get("download_status", "unknown"),
         "candidate_tier": "backup" if item.get("candidate_tier") == "backup" else "top",
+        "difficulty": item.get("difficulty") or {"stars": 3.0, "fit": item.get("dance_type", "街舞"), "scores": {}},
     }
 
 
@@ -165,11 +232,20 @@ def missing_selected_clips(config: dict) -> list[str]:
             or not (REPO / by_id[candidate_id]["local_path"]).is_file()]
 
 
-def default_narration(item: dict, rank: int | None = None, classic: bool = False) -> str:
+DEFAULT_VO_TPL = "第{rank}名，{dance_type}街舞{title}，来自 {creator}。"
+DEFAULT_VO_TPL_CLASSIC = "特别加映，{dance_type}街舞{title}，来自 {creator}。"
+
+def default_narration(item: dict, rank: int | None = None, classic: bool = False, meta: dict | None = None) -> str:
     creator = str(item.get("creator", "")).lstrip("@") or "这位编舞者"
     dance_type = item.get("dance_type", "街舞") or "街舞"
-    prefix = "特别加映" if classic else f"第{rank}名" if rank else "本周推荐"
-    return f"{prefix}，{dance_type}，来自 {creator}。"
+    title = str(item.get("song") or item.get("title") or "").strip("《》").strip()
+    meta = meta or {}
+    tpl = (meta.get("vo_template_classic") if classic else meta.get("vo_template")) \
+          or (DEFAULT_VO_TPL_CLASSIC if classic else DEFAULT_VO_TPL)
+    try:
+        return tpl.format(rank=rank or 0, dance_type=dance_type, title=title, creator=creator)
+    except Exception:
+        return f"{'特别加映' if classic else f'第{rank}名'}，{dance_type}街舞{title}，来自 {creator}。"
 
 
 def workspaces(recent_weeks: int = 12) -> list[dict]:
@@ -192,6 +268,14 @@ def workspaces(recent_weeks: int = 12) -> list[dict]:
 def build_editor_config(week: str, payload: dict) -> dict:
     old = load_config(week)
     entries = [normalize_candidate(item, i + 1) for i, item in enumerate(payload.get("candidates", []))]
+    # SAFETY: 若 payload.candidates 明显少于 old（分页 UI 只发了当前页），走 MERGE 模式
+    #         合并 payload 覆盖到 old，不整体替换；防止候选池被前端脏数据抹掉
+    old_by_id = {c["id"]: c for c in old.get("this_week_candidates", []) + old.get("classics_pool", [])}
+    if len(entries) < len(old_by_id) * 0.5:
+        merged = dict(old_by_id)
+        for e in entries:
+            merged[e["id"]] = {**old_by_id.get(e["id"], {}), **e}
+        entries = list(merged.values())
     selected = payload.get("selected", [])[:6]
     candidates = {item["id"]: item for item in entries}
     duplicates = historical_urls(week)
@@ -205,6 +289,10 @@ def build_editor_config(week: str, payload: dict) -> dict:
     special_id = next((cid for cid in selected if cid in special_ids and cid in candidates), None)
 
     picks, narration = [], []
+    # 提前拼 metadata，供 default_narration 用模板
+    _meta_preview = {**old.get("metadata", {})}
+    for _k in ("vo_template", "vo_template_classic"):
+        if _k in payload: _meta_preview[_k] = str(payload[_k]).strip()
     for rank, candidate_id in enumerate(top_ids, 1):
         item = candidates.get(candidate_id)
         if not item:
@@ -212,7 +300,7 @@ def build_editor_config(week: str, payload: dict) -> dict:
         difficulty = item.pop("difficulty", None) or {"stars": 3.0, "fit": item["dance_type"], "scores": {}}
         picks.append({"rank": rank, "id": candidate_id, "reason": item.get("manual_note", ""),
                       "highlight_hint": "", "cut_suggestion": "", "difficulty": difficulty})
-        narration.append({"segment": "top", "rank": rank, "vo": item.get("narration", "").strip() or default_narration(item, rank),
+        narration.append({"segment": "top", "rank": rank, "vo": item.get("narration", "").strip() or default_narration(item, rank, meta=_meta_preview),
                   "voice": item.get("voice", "zh-CN-XiaoyiNeural"),
                   "voice_rate": item.get("voice_rate", "+20%"), "subtitle": [],
                           "on_screen": {"stars": difficulty.get("stars", 3.0), "tag": f"本周No.{rank}",
@@ -222,13 +310,20 @@ def build_editor_config(week: str, payload: dict) -> dict:
     classic = {}
     if classic_id:
         classic = {"id": classic_id, "reason": "特别加映", "difficulty": {"stars": 3.0, "fit": "基础练习", "scores": {}}}
-        narration.append({"segment": "classic", "rank": None, "vo": default_narration(classic_pool[0], classic=True), "voice": "zh-CN-XiaoyiNeural",
+        narration.append({"segment": "classic", "rank": None, "vo": default_narration(classic_pool[0], classic=True, meta=_meta_preview), "voice": "zh-CN-XiaoyiNeural",
                   "voice_rate": "+20%", "subtitle": [],
                           "on_screen": {"stars": 3.0, "tag": "特别加映", "core_moves": [classic_pool[0]["dance_type"]]},
                           "beginner_tip": ""})
     metadata = {**old.get("metadata", {})}
     if "video_description" in payload:
         metadata["video_description"] = str(payload.get("video_description", "")).strip()
+    # 全局设置
+    for key in ("intro", "outro"):
+        if key in payload and isinstance(payload[key], dict):
+            metadata[key] = {k: str(v).strip() for k, v in payload[key].items()}
+    for key in ("global_voice", "global_voice_rate", "vo_template", "vo_template_classic"):
+        if key in payload:
+            metadata[key] = str(payload[key]).strip()
     config = {**old, "this_week_candidates": list(candidates.values()), "classics_pool": classic_pool,
               "picks": picks, "classic_comeback": classic, "narration": narration, "metadata": metadata}
     config["episode"].update(payload.get("episode", {}))
@@ -273,6 +368,7 @@ def import_downloads(week: str) -> dict:
     incoming = INCOMING / week
     base = incoming / "dl2"
     config = load_config(week)
+    tombstones = set(config.get("deleted_ids", []))
     current = {canonical_url(c["url"]): c for c in config.get("this_week_candidates", []) if c.get("url")}
     historical = historical_urls(week)
     generic_candidates = incoming / "candidates"
@@ -285,8 +381,11 @@ def import_downloads(week: str) -> dict:
             if canonical_url(url) in historical:
                 continue
             normalized_url = canonical_url(url)
+            iid = current.get(normalized_url, {}).get("id", item.get("id", f"g{index}"))
+            if iid in tombstones or item.get("id") in tombstones:
+                continue
             current[normalized_url] = normalize_candidate({
-                **item, "id": current.get(normalized_url, {}).get("id", item.get("id", f"g{index}")),
+                **item, "id": iid,
             }, index)
     ranked_path = incoming / "ranked_candidates.json"
     if ranked_path.exists():
@@ -477,6 +576,21 @@ class App(SimpleHTTPRequestHandler):
                 save_settings(settings)
                 self.send_json({"ok": True, "settings": settings})
                 return
+            if self.path == "/api/delete-candidate":
+                week, cid = body["week"], body["id"]
+                cfg = load_config(week)
+                cfg["this_week_candidates"] = [c for c in cfg.get("this_week_candidates", []) if c.get("id") != cid]
+                cfg["classics_pool"] = [c for c in cfg.get("classics_pool", []) if c.get("id") != cid]
+                cfg["picks"] = [p for p in cfg.get("picks", []) if p.get("id") != cid]
+                if cfg.get("classic_comeback", {}).get("id") == cid: cfg["classic_comeback"] = {}
+                cfg["narration"] = [n for n in cfg.get("narration", []) if (cfg.get("picks") and n.get("segment") == "top") or (n.get("segment") == "classic" and cfg.get("classic_comeback"))]
+                # tombstone so /api/import won't resurrect it
+                tomb = set(cfg.get("deleted_ids", []))
+                tomb.add(cid)
+                cfg["deleted_ids"] = sorted(tomb)
+                save_config(week, cfg)
+                self.send_json({"ok": True, "config": cfg})
+                return
             if self.path == "/api/save":
                 week = body["week"]
                 config = build_editor_config(week, body)
@@ -484,15 +598,74 @@ class App(SimpleHTTPRequestHandler):
                 self.send_json({"ok": True, "config": config})
                 return
             if self.path == "/api/manual-link":
-                week, url = body["week"], body["url"].strip()
+                week = body["week"]
+                raw = body.get("url", "").strip()
+                note = body.get("note", "").strip()
+                parsed = parse_manual_submission(raw)
+                url = parsed["url"]
+                if not url:
+                    raise ValueError("未在投稿文本中找到有效链接")
                 if canonical_url(url) in historical_urls(week):
                     raise ValueError("该视频已在往期使用，不能重复加入候选池")
                 config = load_config(week)
-                candidates = config["this_week_candidates"]
-                candidates.append(normalize_candidate({"id": f"m{len(candidates) + 1}", "url": url,
-                                                       "source": "投稿", "title": "待抓取投稿", "manual_note": body.get("note", "")}, len(candidates) + 1))
+                # tombstone 保护：不再被 /api/import 冲掉；且 dedup
+                candidates = config.setdefault("this_week_candidates", [])
+                canon = canonical_url(url)
+                existing = next((c for c in candidates if canonical_url(c.get("url", "")) == canon), None)
+                if existing:
+                    existing.update({"title": parsed.get("title") or existing.get("title"),
+                                     "creator": parsed.get("creator") or existing.get("creator"),
+                                     "source": parsed.get("source") or existing.get("source"),
+                                     "manual_note": note or existing.get("manual_note", ""),
+                                     "candidate_tier": "top"})
+                    cid = existing["id"]
+                else:
+                    cid = f"m{sum(1 for c in candidates if c.get('id','').startswith('m')) + 1}"
+                    candidates.append(normalize_candidate({
+                        "id": cid, "url": url, "source": parsed.get("source", "投稿"),
+                        "title": parsed.get("title", "手动投稿"),
+                        "creator": parsed.get("creator", ""),
+                        "author": parsed.get("author", ""),
+                        "dance_type": parsed.get("dance_type", "街舞"),
+                        "platform": parsed.get("platform", "douyin"),
+                        "manual_note": note, "candidate_tier": "top",
+                        "is_manual": True,
+                    }, len(candidates) + 1))
+                # protect from tombstone (in case user previously deleted then re-submits)
+                config["deleted_ids"] = [x for x in config.get("deleted_ids", []) if x != cid]
+                # 手动投稿自动入选：若已在 picks 忽略；否则加到 picks[0] 顶部（把 like 最低的挤出去，直到 5 支）
+                pick_ids = [p["id"] for p in config.get("picks", [])]
+                if cid not in pick_ids and cid != config.get("classic_comeback", {}).get("id"):
+                    picks = config.setdefault("picks", [])
+                    # 保证 <=5，如果满就丢弃 like 最低的
+                    if len(picks) >= 5:
+                        cands_by_id = {c["id"]: c for c in candidates}
+                        picks.sort(key=lambda p: cands_by_id.get(p["id"], {}).get("like", 0), reverse=True)
+                        picks[:] = picks[:4]  # drop the lowest
+                    picks.insert(0, {"rank": 0, "id": cid, "reason": "手动投稿",
+                                     "highlight_hint": "", "cut_suggestion": "",
+                                     "difficulty": {"stars": 3.0, "fit": parsed.get("dance_type", "街舞"), "scores": {}}})
+                    # 重新编号 rank
+                    for i, p in enumerate(picks, 1): p["rank"] = i
+                    cand = next(c for c in candidates if c["id"] == cid)
+                    # 重建 narration top segments 从 picks
+                    old_narr = [n for n in config.get("narration", []) if n.get("segment") != "top"]
+                    new_top = []
+                    for p in picks:
+                        pc = next((c for c in candidates if c["id"] == p["id"]), {})
+                        new_top.append({"segment": "top", "rank": p["rank"],
+                                        "vo": pc.get("manual_note", "") or default_narration(pc, p["rank"]),
+                                        "voice": "zh-CN-XiaoyiNeural", "voice_rate": "+20%",
+                                        "subtitle": [],
+                                        "on_screen": {"stars": p["difficulty"].get("stars", 3.0),
+                                                      "tag": f"本周No.{p['rank']}",
+                                                      "core_moves": [pc.get("dance_type", "街舞")]},
+                                        "beginner_tip": ""})
+                    config["narration"] = new_top + old_narr
+                # 把投稿卡置顶到候选池最前 (前端排序会看它)
+                candidates.sort(key=lambda c: (0 if c.get("id") == cid else 1))
                 save_config(week, config)
-                self.send_json({"ok": True, "config": config})
+                self.send_json({"ok": True, "config": config, "parsed": parsed})
                 return
             if self.path == "/api/import":
                 self.send_json({"ok": True, "config": import_downloads(body["week"])})

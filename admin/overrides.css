@@ -342,3 +342,30 @@
 /* 特别加映 checkbox 单独高亮 */
 .special-control { display:inline-flex; align-items:center; gap:4px; margin-left:8px; font-size:12px; color:#ffb84d; cursor:pointer; }
 .special-control input[type=checkbox] { accent-color:#ffb84d; }
+
+/* 已入选卡片头部位置控件 */
+.pin-bar {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 8px; margin-right:12px;
+  background:rgba(255,77,143,.10); border-radius:6px;
+  border:1px solid rgba(255,77,143,.35);
+}
+.pin-bar button { background:#2a2a3c; color:#fff; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:13px; }
+.pin-bar button:disabled { opacity:.3; cursor:not-allowed; }
+.pin-bar button:hover:not(:disabled) { background:#ff4d8f; }
+.pin-bar .pin-label { font-weight:600; color:#ff4d8f; min-width:78px; text-align:center; font-size:12px; }
+.pin-bar .pin-label.is-special { color:#ffb84d; }
+.pin-bar .pin-special.active { background:#ffb84d; color:#1a1a24; }
+.pin-bar .pin-remove:hover { background:#e33; }
+
+/* 老 order-control 和 is-special checkbox 隐藏 */
+.order-control, .special-control { display:none !important; }
+
+/* 全局设置面板 */
+.global-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px 16px; margin-top:12px; }
+.global-grid .global-full { grid-column: 1 / -1; }
+.global-grid fieldset { border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px 14px; }
+.global-grid fieldset legend { padding:0 8px; font-size:0.85em; opacity:0.7; }
+.global-grid label { display:flex; flex-direction:column; gap:4px; font-size:0.9em; }
+.global-grid input, .global-grid textarea, .global-grid select { width:100%; }
+.global-grid small { opacity:0.6; font-size:0.75em; }

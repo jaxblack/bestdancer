@@ -25,15 +25,38 @@ cfg = json.loads(CFG.read_text(encoding="utf-8"))
 by_id = {c["id"]: c for c in cfg.get("this_week_candidates", []) + cfg.get("classics_pool", [])}
 douyin_picks = [p for p in cfg.get("picks", [])
                 if "douyin.com" in by_id.get(p["id"], {}).get("url", "")]
-want = {re.search(r"/video/(\d+)", by_id[p["id"]]["url"]).group(1): (p, by_id[p["id"]])
-        for p in douyin_picks}
+# also include classic_comeback if it's douyin
+sp = cfg.get("classic_comeback", {})
+if sp.get("id") and "douyin" in by_id.get(sp["id"], {}).get("url", ""):
+    douyin_picks.append({"id": sp["id"], "rank": "SP"})
+# resolve short links (v.douyin.com/xxxx) to canonical /video/<id>
+def _resolve(u):
+    if "/video/" in u:
+        m = re.search(r"/video/(\d+)", u)
+        return m.group(1) if m else None
+    if "v.douyin.com" in u:
+        try:
+            r = subprocess.run(["curl","-sI","-L","-o","/dev/null","-w","%{url_effective}",u],
+                               capture_output=True, text=True, timeout=15)
+            m = re.search(r"/video/(\d+)", r.stdout or "")
+            return m.group(1) if m else None
+        except Exception: return None
+    return None
+want = {}
+for p in douyin_picks:
+    cand = by_id[p["id"]]
+    vid = _resolve(cand.get("url",""))
+    if vid: want[vid] = (p, cand)
 print(f"want {len(want)} douyin: {list(want.keys())}")
 
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
     ctx = b.contexts[0]
     for pg in list(ctx.pages):
-        m = re.search(r"douyin\.com/video/(\d+)", pg.url or "")
+        # Prefer canonical /video/<id> URL over search-modal pages (search page has multiple videos, wrong one leaks)
+        m1 = re.search(r"douyin\.com/video/(\d+)", pg.url or "")
+        m2 = re.search(r"modal_id=(\d+)", pg.url or "")
+        m = m1 if m1 else m2
         if not m or m.group(1) not in want: continue
         vid = m.group(1)
         pk, cand = want[vid]
@@ -45,15 +68,14 @@ with sync_playwright() as p:
         try:
             info = pg.evaluate("""() => {
                 const v = document.querySelector('video');
-                const cs = v ? v.currentSrc : '';
-                // Prefer <source> that includes zjcdn (direct .mp4) over aweme/v1/play (redirect)
-                const srcs = [...document.querySelectorAll('video source')].map(s => s.src);
-                const direct = srcs.find(s => /zjcdn|douyinvod/.test(s)) || cs;
-                // Grab desc/author from DOM as fallback
+                if (!v) return {src:'', duration:0, author:'', desc:''};
+                const cs = v.currentSrc;
+                const srcs = [...v.querySelectorAll('source')].map(s => s.src);
+                const direct = (srcs.find(s => /zjcdn|douyinvod/.test(s))) || cs;
                 const authorNode = document.querySelector('a[href*="/user/"] span, .author-name, [class*=userName]');
                 const descNode = document.querySelector('[class*=D8h] h1, [class*=title] h1, meta[name=description]');
                 return {
-                    src: direct, duration: v ? v.duration : 0,
+                    src: direct, duration: v.duration || 0,
                     author: authorNode ? authorNode.textContent.trim() : '',
                     desc: (descNode && descNode.getAttribute) ? (descNode.getAttribute('content') || descNode.textContent || '').trim() : (descNode ? descNode.textContent.trim() : ''),
                 };
