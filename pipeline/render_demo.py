@@ -195,7 +195,7 @@ def build_segments(cfg: dict) -> list[dict]:
         # 智能同步舞种词：把 vo 里所有旧舞种词/"街舞"替换成当前 dance_type
         if _dt:
             import re as _re
-            _pat = _re.compile(r"(Urban(?:\s*[Dd]ance)?|Hip[- ]?[Hh]op|Jazz|K[- ]?pop|Popping|Locking|嘻哈|爵士|韩舞|街舞)", _re.IGNORECASE)
+            _pat = _re.compile(r"(Urban(?:\s*[Dd]ance)?|Hip[- ]?[Hh]op|Jazz|K[- ]?pop|Popping|Locking|嘻哈|爵士|韩舞)", _re.IGNORECASE)
             full_vo = _pat.sub(_dt, full_vo)
             full_vo = _re.sub(rf"({_re.escape(_dt)})(\s*{_re.escape(_dt)})+", r"\1", full_vo)
         if top:
