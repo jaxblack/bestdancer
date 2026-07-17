@@ -37,13 +37,13 @@
       "source": "抖音",
       "creator": "@NNUNA",
       "title": "叮叮当当舞",
-      "song": "",
+      "song": "叮叮当当舞",
       "duration_sec": 18,
       "like": 349000,
       "play": 0,
       "tags": [],
       "url": "https://www.douyin.com/video/7661965411726624625",
-      "dance_type": "Jazz",
+      "dance_type": "K-pop",
       "local_path": "assets/incoming/2026-W30-A/dl2/douyin_7661965411726624625.mp4",
       "manual_note": "",
       "narration": "第2名，叮叮当当舞，来自 NNUNA。",
@@ -2383,23 +2383,23 @@
       "narration": "第1名，Urban街舞，来自 layla_.mckenzie。"
     },
     {
-      "id": "c9",
+      "id": "c2",
       "rank": 2,
-      "title": "De La Rose",
-      "song": "De La Rose",
-      "creator": "@barbimartinezsok",
-      "url": "https://www.tiktok.com/@barbimartinezsok/video/7641435859601886484",
-      "dance_type": "Urban",
+      "title": "叮叮当当舞",
+      "song": "叮叮当当舞",
+      "creator": "@NNUNA",
+      "url": "https://www.douyin.com/video/7661965411726624625",
+      "dance_type": "K-pop",
       "difficulty": {
         "stars": 3.0,
-        "fit": "Urban",
+        "fit": "K-pop",
         "scores": {}
       },
       "clip_start_sec": 0,
-      "clip_end_sec": 48,
+      "clip_end_sec": 15,
       "voice": "",
       "voice_rate": "",
-      "narration": "第2名，Urban街舞De La Rose，来自 barbimartinezsok。"
+      "narration": "第2名，K-pop街舞叮叮当当舞，来自 NNUNA。"
     },
     {
       "id": "c7",
@@ -2497,7 +2497,7 @@
     {
       "segment": "top",
       "rank": 2,
-      "vo": "第2名，Urban街舞De La Rose，来自 barbimartinezsok。",
+      "vo": "第2名，K-pop街舞叮叮当当舞，来自 NNUNA。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
@@ -2505,7 +2505,7 @@
         "stars": 3,
         "tag": "本周No.2",
         "core_moves": [
-          "Urban"
+          "K-pop"
         ]
       },
       "beginner_tip": ""
