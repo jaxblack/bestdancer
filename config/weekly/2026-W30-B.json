@@ -390,14 +390,14 @@
       "id": "7661902653173432763",
       "source": "抖音",
       "creator": "@Moko的舞蹈收藏夹",
-      "title": "刷到了一版有编舞师的 Jean Victor编舞 #jazz #dance #街舞 #大漂亮舞 #jazzfunk",
-      "song": "",
+      "title": "Jean Victor编舞",
+      "song": "Jean Victor编舞",
       "duration_sec": 0,
       "like": 33000,
       "play": 0,
       "tags": [],
       "url": "https://www.douyin.com/video/7661902653173432763",
-      "dance_type": "街舞",
+      "dance_type": "Jazz",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -2383,23 +2383,23 @@
       "narration": "第1名，Urban街舞，来自 layla_.mckenzie。"
     },
     {
-      "id": "c2",
+      "id": "7661902653173432763",
       "rank": 2,
-      "title": "叮叮当当舞",
-      "song": "叮叮当当舞",
-      "creator": "@NNUNA",
-      "url": "https://www.douyin.com/video/7661965411726624625",
-      "dance_type": "K-pop",
+      "title": "Jean Victor编舞",
+      "song": "Jean Victor编舞",
+      "creator": "@Moko的舞蹈收藏夹",
+      "url": "https://www.douyin.com/video/7661902653173432763",
+      "dance_type": "Jazz",
       "difficulty": {
         "stars": 3.0,
-        "fit": "K-pop",
+        "fit": "Jazz",
         "scores": {}
       },
       "clip_start_sec": 0,
       "clip_end_sec": 15,
       "voice": "",
       "voice_rate": "",
-      "narration": "第2名，K-pop街舞叮叮当当舞，来自 NNUNA。"
+      "narration": "第2名，Jazz街舞Jean Victor编舞，来自 Moko的舞蹈收藏夹。"
     },
     {
       "id": "c7",
@@ -2497,7 +2497,7 @@
     {
       "segment": "top",
       "rank": 2,
-      "vo": "第2名，K-pop街舞叮叮当当舞，来自 NNUNA。",
+      "vo": "第2名，Jazz街舞Jean Victor编舞，来自 Moko的舞蹈收藏夹。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
@@ -2505,7 +2505,7 @@
         "stars": 3,
         "tag": "本周No.2",
         "core_moves": [
-          "K-pop"
+          "Jazz"
         ]
       },
       "beginner_tip": ""
