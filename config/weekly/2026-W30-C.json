@@ -115,34 +115,6 @@
       }
     },
     {
-      "id": "c9",
-      "source": "TikTok",
-      "creator": "@barbimartinezsok",
-      "title": "COREO NUEVA @De La Rose 💋 Mis clases miercoles 17 hs en @urbanodanceestudio CABA, los esperooo! #clases #baile #coreografia #parati",
-      "song": "De La Rose",
-      "duration_sec": 48,
-      "like": 64000,
-      "play": 372100,
-      "tags": [],
-      "url": "https://www.tiktok.com/@barbimartinezsok/video/7641435859601886484",
-      "dance_type": "Urban",
-      "local_path": "assets/incoming/2026-W30-A/dl2/tiktok_7641435859601886484.mp4",
-      "manual_note": "",
-      "narration": "本周推荐，Urban Dance，来自 barbimartinezsok。",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "clip_start_sec": 0,
-      "clip_end_sec": 48.0,
-      "source_desc": "COREO NUEVA @De La Rose 💋 Mis clases miercoles 17 hs en @urbanodanceestudio CABA, los esperooo! #clases #baile #coreografia #parati ",
-      "download_status": "downloaded",
-      "candidate_tier": "top",
-      "difficulty": {
-        "stars": 3,
-        "fit": "Urban",
-        "scores": {}
-      }
-    },
-    {
       "id": "7662384917581514171",
       "source": "抖音",
       "creator": "@麻麻将.",
@@ -166,34 +138,6 @@
       "candidate_tier": "top",
       "difficulty": {
         "stars": 3,
-        "fit": "Urban",
-        "scores": {}
-      }
-    },
-    {
-      "id": "7662369791218322696",
-      "source": "TikTok",
-      "creator": "@tigerlili_xy",
-      "title": "50.4K",
-      "song": "",
-      "duration_sec": 0,
-      "like": 50400,
-      "play": 0,
-      "tags": [],
-      "url": "https://www.tiktok.com/@tigerlili_xy/video/7662369791218322696",
-      "dance_type": "Urban",
-      "local_path": "",
-      "manual_note": "",
-      "narration": "本周推荐，街舞，来自 tigerlili_xy。",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "clip_start_sec": 0,
-      "clip_end_sec": 0,
-      "source_desc": "50.4K\n一场光怪陆离的幻梦👀🐇🧩#newjeans #omg #kpop #dance #fyp\n\ntigerlili_xy\n\n1 天前",
-      "download_status": "unknown",
-      "candidate_tier": "top",
-      "difficulty": {
-        "stars": 4,
         "fit": "Urban",
         "scores": {}
       }
@@ -1105,7 +1049,7 @@
       "play": 0,
       "tags": [],
       "url": "https://www.tiktok.com/@user583413340/video/7661708737119358228",
-      "dance_type": "街舞",
+      "dance_type": "Urban",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -1118,7 +1062,7 @@
       "candidate_tier": "top",
       "difficulty": {
         "stars": 3,
-        "fit": "街舞",
+        "fit": "Urban",
         "scores": {}
       }
     },
@@ -1161,7 +1105,7 @@
       "play": 0,
       "tags": [],
       "url": "https://www.tiktok.com/@milkhater05/video/7662870808104127775",
-      "dance_type": "街舞",
+      "dance_type": "Urban",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -1174,7 +1118,7 @@
       "candidate_tier": "top",
       "difficulty": {
         "stars": 3,
-        "fit": "街舞",
+        "fit": "Urban",
         "scores": {}
       }
     },
@@ -2238,34 +2182,6 @@
       }
     },
     {
-      "id": "k1",
-      "source": "TikTok",
-      "creator": "@barbimartinezsok",
-      "title": "Urban Dance",
-      "song": "",
-      "duration_sec": 48,
-      "like": 64000,
-      "play": 0,
-      "tags": [],
-      "url": "https://www.tiktok.com/@barbimartinezsok/video/7641435859601886484",
-      "dance_type": "Urban",
-      "local_path": "assets/incoming/2026-W30-A/k1__tiktok__7641435859601886484.mp4",
-      "manual_note": "",
-      "narration": "本周推荐，Urban Dance，来自 barbimartinezsok。",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "clip_start_sec": 0,
-      "clip_end_sec": 48.0,
-      "source_desc": "",
-      "download_status": "unknown",
-      "candidate_tier": "top",
-      "difficulty": {
-        "stars": 3,
-        "fit": "Urban",
-        "scores": {}
-      }
-    },
-    {
       "id": "c12",
       "source": "TikTok",
       "creator": "@leelosh3009",
@@ -2344,26 +2260,26 @@
   ],
   "picks": [
     {
-      "id": "c9",
+      "id": "7662870808104127775",
       "source": "TikTok",
-      "creator": "@barbimartinezsok",
-      "title": "COREO NUEVA @De La Rose 💋 Mis clases miercoles 17 hs en @urbanodanceestudio CABA, los esperooo! #clases #baile #coreografia #parati",
-      "song": "De La Rose",
-      "duration_sec": 48,
-      "like": 64000,
-      "play": 372100,
+      "creator": "@milkhater05",
+      "title": "1332",
+      "song": "",
+      "duration_sec": 0,
+      "like": 1332,
+      "play": 0,
       "tags": [],
-      "url": "https://www.tiktok.com/@barbimartinezsok/video/7641435859601886484",
+      "url": "https://www.tiktok.com/@milkhater05/video/7662870808104127775",
       "dance_type": "Urban",
-      "local_path": "assets/incoming/2026-W30-A/dl2/tiktok_7641435859601886484.mp4",
+      "local_path": "",
       "manual_note": "",
-      "narration": "本周推荐，Urban Dance，来自 barbimartinezsok。",
+      "narration": "",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "clip_start_sec": 0,
-      "clip_end_sec": 48.0,
-      "source_desc": "COREO NUEVA @De La Rose 💋 Mis clases miercoles 17 hs en @urbanodanceestudio CABA, los esperooo! #clases #baile #coreografia #parati ",
-      "download_status": "downloaded",
+      "clip_end_sec": 0,
+      "source_desc": "1332\ni finally learned a different dance LMAO\n\nmilkhater05\n\n3 小时前",
+      "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
         "stars": 3,
@@ -2460,29 +2376,29 @@
       "rank": 4
     },
     {
-      "id": "7662369791218322696",
+      "id": "7661708737119358228",
       "source": "TikTok",
-      "creator": "@tigerlili_xy",
-      "title": "50.4K",
+      "creator": "@user583413340",
+      "title": "1576",
       "song": "",
       "duration_sec": 0,
-      "like": 50400,
+      "like": 1576,
       "play": 0,
       "tags": [],
-      "url": "https://www.tiktok.com/@tigerlili_xy/video/7662369791218322696",
+      "url": "https://www.tiktok.com/@user583413340/video/7661708737119358228",
       "dance_type": "Urban",
       "local_path": "",
       "manual_note": "",
-      "narration": "本周推荐，街舞，来自 tigerlili_xy。",
+      "narration": "",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "clip_start_sec": 0,
       "clip_end_sec": 0,
-      "source_desc": "50.4K\n一场光怪陆离的幻梦👀🐇🧩#newjeans #omg #kpop #dance #fyp\n\ntigerlili_xy\n\n1 天前",
+      "source_desc": "1576\n\nuser583413340\n\n2 天前",
       "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
-        "stars": 4,
+        "stars": 3,
         "fit": "Urban",
         "scores": {}
       },
@@ -2521,7 +2437,7 @@
     {
       "segment": "top",
       "rank": 1,
-      "vo": "第1名，Urban街舞 De La Rose，来自 barbimartinezsok。",
+      "vo": "第1名，Urban街舞，来自 milkhater05。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
@@ -2585,12 +2501,12 @@
     {
       "segment": "top",
       "rank": 5,
-      "vo": "第5名，Urban街舞，来自 tigerlili_xy。",
+      "vo": "第5名，Urban街舞，来自 user583413340。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
       "on_screen": {
-        "stars": 4,
+        "stars": 3,
         "tag": "本周No.5",
         "core_moves": [
           "Urban"
@@ -2633,5 +2549,8 @@
     "vo_template": "第{rank}名，{dance_type}街舞{title}，来自 {creator}。",
     "vo_template_classic": "特别加映，{dance_type}街舞{title}，来自 {creator}。"
   },
-  "deleted_ids": []
+  "deleted_ids": [
+    "7662369791218322696",
+    "c9"
+  ]
 }

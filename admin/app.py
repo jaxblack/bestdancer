@@ -20,6 +20,32 @@ REPO = Path(__file__).resolve().parents[1]
 ADMIN = REPO / "admin"
 WEEKLY = REPO / "config" / "weekly"
 INCOMING = REPO / "assets" / "incoming"
+BLACKLIST_PATH = REPO / "config" / "blacklist.json"
+
+
+def load_blacklist() -> set[str]:
+    """永不录用的 canonical URL 集合。跨周永久生效。"""
+    if not BLACKLIST_PATH.exists():
+        return set()
+    try:
+        data = json.loads(BLACKLIST_PATH.read_text(encoding="utf-8"))
+        return {canonical_url(u) for u in data.get("urls", []) if u}
+    except Exception:
+        return set()
+
+
+def save_blacklist(urls: set[str]) -> None:
+    BLACKLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"urls": sorted(urls)}
+    BLACKLIST_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def blacklist_add(url: str, note: str = "") -> None:
+    urls = load_blacklist()
+    cu = canonical_url(url)
+    if cu:
+        urls.add(cu)
+        save_blacklist(urls)
 PREVIEW_AUDIO = ADMIN / "audio"
 PREVIEW_VIDEO = ADMIN / "video-preview"
 VOICE_PRESETS = {
@@ -338,7 +364,7 @@ def canonical_url(value: str) -> str:
 
 
 def historical_urls(active_week: str) -> set[str]:
-    urls = set()
+    urls = set(load_blacklist())  # 永不录用 URL 也算"已用" -> 阻止导入/手动加入
     for path in WEEKLY.glob("????-W??*.json"):
         if path.stem == active_week or not WEEK_ID.fullmatch(path.stem):
             continue
@@ -575,6 +601,39 @@ class App(SimpleHTTPRequestHandler):
                             "sort_by": body.get("sort_by", "heat_desc")}
                 save_settings(settings)
                 self.send_json({"ok": True, "settings": settings})
+                return
+            if self.path == "/api/blacklist-add":
+                # 永不录用: 加入 URL 黑名单 + 从当前 week 删除
+                week = body.get("week", "")
+                cid = body.get("id", "")
+                url = body.get("url", "").strip()
+                cfg = load_config(week) if week else {}
+                # 若前端只给了 id, 从 config 查 url
+                if not url and cid and cfg:
+                    for c in cfg.get("this_week_candidates", []) + cfg.get("classics_pool", []) + cfg.get("picks", []):
+                        if c.get("id") == cid and c.get("url"):
+                            url = c["url"]; break
+                    sp = cfg.get("classic_comeback", {})
+                    if not url and sp.get("id") == cid and sp.get("url"):
+                        url = sp["url"]
+                if not url:
+                    raise ValueError("blacklist-add: 未提供 url 且无法从 id 反查")
+                blacklist_add(url)
+                # 顺便从当前 week 里也删掉这个 pick/候选
+                if cfg:
+                    cu = canonical_url(url)
+                    def _keep(c): return canonical_url(c.get("url", "")) != cu
+                    cfg["this_week_candidates"] = [c for c in cfg.get("this_week_candidates", []) if _keep(c)]
+                    cfg["classics_pool"] = [c for c in cfg.get("classics_pool", []) if _keep(c)]
+                    cfg["picks"] = [p for p in cfg.get("picks", []) if _keep(p)]
+                    if not _keep(cfg.get("classic_comeback", {})):
+                        cfg["classic_comeback"] = {}
+                    if cid:
+                        tomb = set(cfg.get("deleted_ids", []))
+                        tomb.add(cid)
+                        cfg["deleted_ids"] = sorted(tomb)
+                    save_config(week, cfg)
+                self.send_json({"ok": True, "blacklist_size": len(load_blacklist()), "config": cfg})
                 return
             if self.path == "/api/delete-candidate":
                 week, cid = body["week"], body["id"]

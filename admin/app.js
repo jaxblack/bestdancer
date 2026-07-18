@@ -176,6 +176,30 @@ function renderCandidates() {
     deleteButton.type = "button"; deleteButton.className = "delete-candidate"; deleteButton.textContent = "删除";
     deleteButton.title = "从本期候选池删除";
     link.before(deleteButton);
+    const banButton = document.createElement("button");
+    banButton.type = "button"; banButton.className = "delete-candidate ban-candidate"; banButton.textContent = "永不录用";
+    banButton.title = "加入永久黑名单，所有周次都不再出现";
+    banButton.style.marginLeft = "4px"; banButton.style.background = "#a83232";
+    link.before(banButton);
+    banButton.addEventListener("click", async () => {
+      if (!confirm(`永不录用 ${item.creator || item.id}?\n此 URL 将从所有周次的候选池中永久排除。`)) return;
+      deletedCandidateIds.add(item.id);
+      selectedOrder = selectedOrder.filter((id) => id !== item.id);
+      editBuffer.delete(item.id);
+      renderCandidates();
+      try {
+        const result = await api("/api/blacklist-add", { method: "POST", body: JSON.stringify({ week: $("#week").value, id: item.id, url: item.url || "" }) });
+        state.config = result.config;
+        state.selected = selected();
+        deletedCandidateIds.delete(item.id);
+        renderCandidates();
+        $("#status").textContent = `已加入永不录用（黑名单共 ${result.blacklist_size} 条）`;
+      } catch (error) {
+        deletedCandidateIds.delete(item.id);
+        renderCandidates();
+        $("#status").textContent = `永不录用失败：${error.message}`;
+      }
+    });
     deleteButton.addEventListener("click", async () => {
       deletedCandidateIds.add(item.id);
       selectedOrder = selectedOrder.filter((id) => id !== item.id);
