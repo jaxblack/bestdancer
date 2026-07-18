@@ -344,7 +344,7 @@ def render_overlay(seg) -> Image.Image:
         vo_lines = wrap(d, vo_cap, F_SUB, W - 2 * MARGIN - 40)[:3]
         line_h = F_SUB.size + 14
         box_h = line_h * len(vo_lines) + 30
-        box_top = H - box_h - 60
+        box_top = H - 232 - box_h - 24
         d.rounded_rectangle([MARGIN - 8, box_top, W - MARGIN + 8, box_top + box_h],
                             radius=18, fill=(0, 0, 0, 190))
         y = box_top + 15 + line_h / 2
