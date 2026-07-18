@@ -102,9 +102,12 @@ def clean(s: str) -> str:
 
 
 def sanitize_tts(vo: str) -> str:
-    """去掉 @句柄，避免神经语音把英文 ID 逐字母念。"""
+    """去掉 @句柄，避免神经语音把英文 ID 逐字母念；同时抹掉标点，让 TTS 顺读不停顿。"""
     vo = re.sub(r"@\S+\s*的", "", vo)
     vo = re.sub(r"@\S+\s*", "", vo)
+    # 中英文标点全替换为空格 —— 抖音风口播不需要"逗号顿号"被念/顿
+    vo = re.sub(r"[，。！？、；：,\.!\?;:]+", " ", vo)
+    vo = re.sub(r"\s+", " ", vo).strip()
     return clean(vo)
 
 
@@ -310,8 +313,8 @@ def render_overlay(seg) -> Image.Image:
     for ln in wrap(d, seg["title"], F_TITLE, W - 2 * MARGIN)[:1]:
         d.text((W / 2, 116), ln, font=F_TITLE, fill=CA, anchor="mm")
     # 「平台 空格 @作者」 无标点，符合用户偏好
-    byline_parts = [seg.get("source", "").strip(), seg.get("creator", "").strip()]
-    byline = " ".join(p for p in byline_parts if p)
+    # 屏幕字幕只保留 @作者 —— 不出现平台名（用户要求）
+    byline = seg.get("creator", "").strip()
     if byline:
         d.text((W / 2, 162), byline, font=F_SMALL, fill=GRAY, anchor="mm")
     # 观看/点赞 用「万」精度；缺失就不写
@@ -575,9 +578,9 @@ def main() -> int:
             except Exception as e2:  # noqa: BLE001
                 print(f"[warn] SAPI 也失败({e2})，出无声样片")
 
-    default_dur = {"intro": 5.0, "top": 15.0, "classic": 15.0, "outro": 6.0}
-    min_dur = {"intro": 4.0, "top": 10.0, "classic": 10.0, "outro": 6.0}
-    max_dur = {"intro": 8.0, "top": 20.0, "classic": 20.0, "outro": 8.0}
+    default_dur = {"intro": 3.5, "top": 15.0, "classic": 15.0, "outro": 6.0}
+    min_dur = {"intro": 2.5, "top": 10.0, "classic": 10.0, "outro": 6.0}
+    max_dur = {"intro": 5.0, "top": 20.0, "classic": 20.0, "outro": 8.0}
     timeline, t0, wavs = [], 0.0, []
     for i, s in enumerate(segs):
         wp = tts_dir / f"{i:02d}.wav"
