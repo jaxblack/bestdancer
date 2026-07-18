@@ -344,24 +344,14 @@ def render_overlay(seg) -> Image.Image:
         vo_lines = wrap(d, vo_cap, F_SUB, W - 2 * MARGIN - 40)[:3]
         line_h = F_SUB.size + 14
         box_h = line_h * len(vo_lines) + 30
-        box_top = H - 232 - box_h - 24
+        box_top = H - box_h - 60
         d.rounded_rectangle([MARGIN - 8, box_top, W - MARGIN + 8, box_top + box_h],
                             radius=18, fill=(0, 0, 0, 190))
         y = box_top + 15 + line_h / 2
         for ln in vo_lines:
             d.text((W / 2, y), ln, font=F_SUB, fill=WHITE, anchor="mm")
             y += line_h
-    # 底部面板（与顶部同高）
-    d.rounded_rectangle([-40, H - 232, W + 40, H + 40], radius=26, fill=(8, 8, 16, 168))
-    chips_row(d, seg["moves"], H - 216)
-    subtitles = [text for text in seg.get("subtitles", []) if text]
-    y = H - 158
-    for i, text in enumerate(subtitles[:3]):
-        font = F_SUB if i == 0 else F_SMALL
-        color = WHITE if i == 0 else CA
-        for ln in wrap(d, text, font, W - 2 * MARGIN - 24)[:1]:
-            d.text((W / 2, y), ln, font=font, fill=color, anchor="mm")
-        y += 40
+    # 底部面板已移除（用户 2026-07 要求：内容少没必要，让画面更干净）
     return img
 
 
