@@ -367,34 +367,6 @@
       }
     },
     {
-      "id": "7662715580079787291",
-      "source": "抖音",
-      "creator": "@爆爆大王",
-      "title": "#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct",
-      "song": "NCT127 中本悠太",
-      "duration_sec": 0,
-      "like": 30000,
-      "play": 0,
-      "tags": [],
-      "url": "https://www.douyin.com/video/7662715580079787291",
-      "dance_type": "K-pop",
-      "local_path": "",
-      "manual_note": "",
-      "narration": "",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "clip_start_sec": 0,
-      "clip_end_sec": 0,
-      "source_desc": "00:45\n3.0万\n#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct\n@爆爆大王\n13小时前",
-      "download_status": "unknown",
-      "candidate_tier": "top",
-      "difficulty": {
-        "stars": 4,
-        "fit": "K-pop",
-        "scores": {}
-      }
-    },
-    {
       "id": "c7",
       "source": "TikTok",
       "creator": "@redflowmx",
@@ -623,7 +595,7 @@
       "source": "小红书",
       "creator": "@Pacha_kha",
       "title": "爽看安乾镐四大神级女团舞cha！",
-      "song": "",
+      "song": "安乾镐女团舞",
       "duration_sec": 107,
       "like": 5098,
       "play": 0,
@@ -641,7 +613,7 @@
       "download_status": "downloaded",
       "candidate_tier": "backup",
       "difficulty": {
-        "stars": 3,
+        "stars": 4,
         "fit": "K-pop",
         "scores": {}
       }
@@ -2320,27 +2292,27 @@
       "rank": 4
     },
     {
-      "id": "7662715580079787291",
-      "source": "抖音",
-      "creator": "@爆爆大王",
-      "title": "#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct",
-      "song": "NCT127 中本悠太",
-      "duration_sec": 0,
-      "like": 30000,
+      "id": "c26",
+      "source": "小红书",
+      "creator": "@Pacha_kha",
+      "title": "爽看安乾镐四大神级女团舞cha！",
+      "song": "安乾镐女团舞",
+      "duration_sec": 107,
+      "like": 5098,
       "play": 0,
       "tags": [],
-      "url": "https://www.douyin.com/video/7662715580079787291",
+      "url": "https://www.xiaohongshu.com/search_result/6a37e0750000000007029636?xsec_token=ABF8TLa7x_MjMReqg_5VzfeuOWn0I-JxRlvNZ9hiOqUHU=&xsec_source=",
       "dance_type": "K-pop",
-      "local_path": "",
+      "local_path": "assets/incoming/2026-W30-A/dl2/xiaohongshu_6a37e0750000000007029636.mp4",
       "manual_note": "",
       "narration": "",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "clip_start_sec": 0,
       "clip_end_sec": 0,
-      "source_desc": "00:45\n3.0万\n#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct\n@爆爆大王\n13小时前",
-      "download_status": "unknown",
-      "candidate_tier": "top",
+      "source_desc": "爽看安乾镐四大神级女团舞cha！",
+      "download_status": "downloaded",
+      "candidate_tier": "backup",
       "difficulty": {
         "stars": 4,
         "fit": "K-pop",
@@ -2445,7 +2417,7 @@
     {
       "segment": "top",
       "rank": 5,
-      "vo": "第5名，K-pop街舞 NCT127 中本悠太，来自 爆爆大王。",
+      "vo": "第5名，K-pop街舞 安乾镐女团舞，来自 Pacha_kha。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
@@ -2496,6 +2468,7 @@
   "deleted_ids": [
     "7661708737119358228",
     "7662369791218322696",
+    "7662715580079787291",
     "7662870808104127775",
     "c9"
   ]

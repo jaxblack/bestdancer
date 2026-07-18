@@ -21,6 +21,8 @@ ADMIN = REPO / "admin"
 WEEKLY = REPO / "config" / "weekly"
 INCOMING = REPO / "assets" / "incoming"
 BLACKLIST_PATH = REPO / "config" / "blacklist.json"
+# 原视频时长超过此秒数, 不进入候选池 (用户2026-07要求; 0=禁用)
+MAX_DURATION_SEC = 180
 
 
 def load_blacklist() -> set[str]:
@@ -422,6 +424,8 @@ def import_downloads(week: str) -> dict:
             url = f"https://www.douyin.com/video/{video_id}"
             if canonical_url(url) in historical:
                 continue
+            if MAX_DURATION_SEC and (item.get("duration_sec") or 0) > MAX_DURATION_SEC:
+                continue
             local_video = base / f"{video_id}.mp4"
             normalized_url = canonical_url(url)
             current[normalized_url] = normalize_candidate({
@@ -446,6 +450,8 @@ def import_downloads(week: str) -> dict:
             "bilibili":     f"https://www.bilibili.com/video/{video_id}",
         }.get(plat, f"https://www.douyin.com/video/{video_id}")
         if canonical_url(url) in historical:
+            continue
+        if MAX_DURATION_SEC and (item.get("duration_sec") or 0) > MAX_DURATION_SEC:
             continue
         normalized_url = canonical_url(url)
         current[normalized_url] = normalize_candidate({
