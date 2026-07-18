@@ -150,9 +150,15 @@ def build_segments(cfg: dict) -> list[dict]:
     # 支持 {year} {week} {edition} 变量: 2026-W30-A → year=26 week=30 edition=上
     _wk = ep.get("week", "") or ""
     import re as _re
-    _m = _re.match(r"(\d{4})-W(\d{1,2})(?:-([AB]))?", _wk)
+    _m = _re.match(r"(\d{4})-W(\d{1,2})(?:-([A-Z]))?", _wk)
     if _m:
-        _yr = _m.group(1)[-2:]; _wn = int(_m.group(2)); _ed = {"A":"上","B":"下"}.get(_m.group(3) or "", "")
+        _yr = _m.group(1)[-2:]; _wn = int(_m.group(2))
+        # edition 支持 A..Z: A=第一 B=第二 C=第三 ...；无 edition→空串
+        _ed_letter = _m.group(3) or ""
+        _ORD = ["一","二","三","四","五","六","七","八","九","十",
+                "十一","十二","十三","十四","十五","十六","十七","十八","十九","二十",
+                "二十一","二十二","二十三","二十四","二十五","二十六"]
+        _ed = f"第{_ORD[ord(_ed_letter)-65]}篇" if _ed_letter and _ed_letter.isalpha() else ""
     else:
         _yr = ""; _wn = ""; _ed = ""
     _intro_vo_default = f"{_yr}年第{_wn}周热舞榜，{_ed}" if _yr else "本周热舞榜"

@@ -35,13 +35,17 @@ UPLOAD_URL = "https://creator.douyin.com/creator-micro/content/upload"
 
 def build_title(week: str) -> str:
     """从 week key 生成标题（<=30 字）。2026-W30-B → '26年第30周热舞榜（下）｜跨平台编舞精选'"""
-    m = re.match(r"(\d{4})-W(\d{1,2})(?:-([AB]))?", week)
+    m = re.match(r"(\d{4})-W(\d{1,2})(?:-([A-Z]))?", week)
     if not m:
         return f"热舞榜 {week}"
     yr = m.group(1)[-2:]
     wn = int(m.group(2))
-    ed = {"A": "上", "B": "下"}.get(m.group(3) or "", "")
-    ed_part = f"（{ed}）" if ed else ""
+    letter = m.group(3) or ""
+    # A=第一篇 B=第二篇 ... Z=第二十六篇；无 edition = 单期
+    ORD = ["一","二","三","四","五","六","七","八","九","十",
+           "十一","十二","十三","十四","十五","十六","十七","十八","十九","二十",
+           "二十一","二十二","二十三","二十四","二十五","二十六"]
+    ed_part = f"·第{ORD[ord(letter)-65]}篇" if letter else ""
     title = f"{yr}年第{wn}周热舞榜{ed_part}｜跨平台编舞精选"
     return title[:30]
 

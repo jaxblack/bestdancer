@@ -270,7 +270,8 @@ function payload() { return { week: $("#week").value, episode: { week: $("#week"
 function buildVideoDescription() {
   const all = new Map(candidates().map((item) => [item.id, item]));
   const ranked = selected().map((id) => all.get(id)).filter(Boolean);
-  const week = $("#week").value.replace(/^(\d{4})-W(\d{2})(?:-([AB]))?$/, (_, year, number, edition) => `${year} 年第${number}周${edition === "A" ? "上部" : edition === "B" ? "下部" : ""}`);
+  const ORD = ["一","二","三","四","五","六","七","八","九","十","十一","十二","十三","十四","十五","十六","十七","十八","十九","二十","二十一","二十二","二十三","二十四","二十五","二十六"];
+  const week = $("#week").value.replace(/^(\d{4})-W(\d{2})(?:-([A-Z]))?$/, (_, year, number, edition) => `${year} 年第${number}周${edition ? "·第" + ORD[edition.charCodeAt(0)-65] + "篇" : ""}`);
   if (!ranked.length) return `${week}热舞又来啦！先在候选池勾选并排好本期视频，再生成排行榜。`;
   const list = ranked.map((item, index) => {
     const prefix = index < 5 ? `${index + 1}.` : "特别加映：";
@@ -300,8 +301,8 @@ function renderWorkspaces(workspaces, activeWeek) {
     list.append(button);
   }
 }
-function baseWeek(value) { return value.replace(/-[AB]$/, ""); }
-function syncEdition() { const match = $("#week").value.match(/-([AB])$/); $("#edition").value = match ? match[1] : ""; }
+function baseWeek(value) { return value.replace(/-[A-Z]$/, ""); }
+function syncEdition() { const match = $("#week").value.match(/-([A-Z])$/); $("#edition").value = match ? match[1] : ""; }
 function setEdition() {
   const target = `${baseWeek($("#week").value)}${$("#edition").value ? `-${$("#edition").value}` : ""}`;
   if (![...$("#week").options].some((option) => option.value === target)) $("#week").append(new Option(`${target} · 未开始`, target));
