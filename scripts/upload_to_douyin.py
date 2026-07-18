@@ -153,13 +153,16 @@ def main():
         print("[+] 推入 mp4 via CDP.setFileInputFiles ...")
         push_file_via_cdp(ctx, pg, mp4)
 
-        # 等页面跳到 post/video
-        for _ in range(30):
+        # 等页面跳到 post/video；抖音有时上传启动前会先弹认证/预审
+        # 弹窗，跳转可能延后 20-60 秒，别一超时就放弃
+        for i in range(90):
             time.sleep(1)
             if "content/post/video" in (pg.url or ""):
                 break
+            if i and i % 15 == 0:
+                print(f"    等待跳转... {i}s (URL 仍是 {pg.url})")
         else:
-            sys.exit("上传未启动 —— URL 未跳转到 content/post/video")
+            print("[warn] URL 未跳转，但文件可能已入队；继续尝试填表")
         print(f"[+] 上传已启动: {pg.url}")
 
         time.sleep(3)
