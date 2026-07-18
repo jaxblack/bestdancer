@@ -107,6 +107,8 @@ def sanitize_tts(vo: str) -> str:
     vo = re.sub(r"@\S+\s*", "", vo)
     # 中英文标点全替换为空格 —— 抖音风口播不需要"逗号顿号"被念/顿
     vo = re.sub(r"[，。！？、；：,\.!\?;:]+", " ", vo)
+    # 作者名/song 里的下划线/点/连字符也不发音（例如 ___rhyan / a.b.c）
+    vo = re.sub(r"[_\.\-]+", " ", vo)
     vo = re.sub(r"\s+", " ", vo).strip()
     return clean(vo)
 
