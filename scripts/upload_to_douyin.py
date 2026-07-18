@@ -71,8 +71,16 @@ def build_description(cfg: dict, title: str) -> str:
 
 
 def find_or_open_upload_page(ctx):
+    # 先精确匹配 upload/post 页；其他 creator 页(manage/home)不算
+    for x in ctx.pages:
+        u = x.url or ""
+        if "creator.douyin.com/creator-micro/content/upload" in u \
+           or "creator.douyin.com/creator-micro/content/post" in u:
+            return x
+    # 有 creator tab 但在别的页(manage/home) -> 复用它导航
     for x in ctx.pages:
         if "creator.douyin.com" in (x.url or ""):
+            x.goto(UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
             return x
     pg = ctx.new_page()
     pg.goto(UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
