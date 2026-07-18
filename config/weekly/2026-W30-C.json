@@ -203,13 +203,13 @@
       "source": "抖音",
       "creator": "@一颗圆佑弹",
       "title": "小猪醋意摇🐽 我的精神食粮，任何时间，任何地点，随时观看！#ald1 #ald1香港 #郑相炫 #kpop演唱会 #醋意摇",
-      "song": "",
+      "song": "圆佑 stage",
       "duration_sec": 0,
       "like": 43000,
       "play": 0,
       "tags": [],
       "url": "https://www.douyin.com/video/7661965284673493412",
-      "dance_type": "街舞",
+      "dance_type": "K-pop",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -221,8 +221,8 @@
       "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
-        "stars": 3,
-        "fit": "街舞",
+        "stars": 4,
+        "fit": "K-pop",
         "scores": {}
       }
     },
@@ -371,13 +371,13 @@
       "source": "抖音",
       "creator": "@爆爆大王",
       "title": "#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct",
-      "song": "",
+      "song": "NCT127 中本悠太",
       "duration_sec": 0,
       "like": 30000,
       "play": 0,
       "tags": [],
       "url": "https://www.douyin.com/video/7662715580079787291",
-      "dance_type": "街舞",
+      "dance_type": "K-pop",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -389,8 +389,8 @@
       "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
-        "stars": 3,
-        "fit": "街舞",
+        "stars": 4,
+        "fit": "K-pop",
         "scores": {}
       }
     },
@@ -1039,34 +1039,6 @@
       }
     },
     {
-      "id": "7661708737119358228",
-      "source": "TikTok",
-      "creator": "@user583413340",
-      "title": "1576",
-      "song": "",
-      "duration_sec": 0,
-      "like": 1576,
-      "play": 0,
-      "tags": [],
-      "url": "https://www.tiktok.com/@user583413340/video/7661708737119358228",
-      "dance_type": "Urban",
-      "local_path": "",
-      "manual_note": "",
-      "narration": "",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "clip_start_sec": 0,
-      "clip_end_sec": 0,
-      "source_desc": "1576\n\nuser583413340\n\n2 天前",
-      "download_status": "unknown",
-      "candidate_tier": "top",
-      "difficulty": {
-        "stars": 3,
-        "fit": "Urban",
-        "scores": {}
-      }
-    },
-    {
       "id": "DT7V0enDJm_",
       "source": "Instagram",
       "creator": "",
@@ -1091,34 +1063,6 @@
       "difficulty": {
         "stars": 3,
         "fit": "街舞",
-        "scores": {}
-      }
-    },
-    {
-      "id": "7662870808104127775",
-      "source": "TikTok",
-      "creator": "@milkhater05",
-      "title": "1332",
-      "song": "",
-      "duration_sec": 0,
-      "like": 1332,
-      "play": 0,
-      "tags": [],
-      "url": "https://www.tiktok.com/@milkhater05/video/7662870808104127775",
-      "dance_type": "Urban",
-      "local_path": "",
-      "manual_note": "",
-      "narration": "",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "clip_start_sec": 0,
-      "clip_end_sec": 0,
-      "source_desc": "1332\ni finally learned a different dance LMAO\n\nmilkhater05\n\n3 小时前",
-      "download_status": "unknown",
-      "candidate_tier": "top",
-      "difficulty": {
-        "stars": 3,
-        "fit": "Urban",
         "scores": {}
       }
     },
@@ -2260,17 +2204,17 @@
   ],
   "picks": [
     {
-      "id": "7662870808104127775",
-      "source": "TikTok",
-      "creator": "@milkhater05",
-      "title": "1332",
-      "song": "",
+      "id": "7661965284673493412",
+      "source": "抖音",
+      "creator": "@一颗圆佑弹",
+      "title": "小猪醋意摇🐽 我的精神食粮，任何时间，任何地点，随时观看！#ald1 #ald1香港 #郑相炫 #kpop演唱会 #醋意摇",
+      "song": "圆佑 stage",
       "duration_sec": 0,
-      "like": 1332,
+      "like": 43000,
       "play": 0,
       "tags": [],
-      "url": "https://www.tiktok.com/@milkhater05/video/7662870808104127775",
-      "dance_type": "Urban",
+      "url": "https://www.douyin.com/video/7661965284673493412",
+      "dance_type": "K-pop",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -2278,12 +2222,12 @@
       "voice_rate": "+20%",
       "clip_start_sec": 0,
       "clip_end_sec": 0,
-      "source_desc": "1332\ni finally learned a different dance LMAO\n\nmilkhater05\n\n3 小时前",
+      "source_desc": "00:32\n4.3万\n小猪醋意摇🐽 我的精神食粮，任何时间，任何地点，随时观看！#ald1 #ald1香港 #郑相炫 #kpop演唱会 #醋意摇\n@一颗圆佑弹\n2天前",
       "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
-        "stars": 3,
-        "fit": "Urban",
+        "stars": 4,
+        "fit": "K-pop",
         "scores": {}
       },
       "rank": 1
@@ -2376,17 +2320,17 @@
       "rank": 4
     },
     {
-      "id": "7661708737119358228",
-      "source": "TikTok",
-      "creator": "@user583413340",
-      "title": "1576",
-      "song": "",
+      "id": "7662715580079787291",
+      "source": "抖音",
+      "creator": "@爆爆大王",
+      "title": "#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct",
+      "song": "NCT127 中本悠太",
       "duration_sec": 0,
-      "like": 1576,
+      "like": 30000,
       "play": 0,
       "tags": [],
-      "url": "https://www.tiktok.com/@user583413340/video/7661708737119358228",
-      "dance_type": "Urban",
+      "url": "https://www.douyin.com/video/7662715580079787291",
+      "dance_type": "K-pop",
       "local_path": "",
       "manual_note": "",
       "narration": "",
@@ -2394,12 +2338,12 @@
       "voice_rate": "+20%",
       "clip_start_sec": 0,
       "clip_end_sec": 0,
-      "source_desc": "1576\n\nuser583413340\n\n2 天前",
+      "source_desc": "00:45\n3.0万\n#NCT127全员续约 2026感动Kpop年度人物:NCT127 中本悠太#nct127 #中本悠太 #感动 #nct\n@爆爆大王\n13小时前",
       "download_status": "unknown",
       "candidate_tier": "top",
       "difficulty": {
-        "stars": 3,
-        "fit": "Urban",
+        "stars": 4,
+        "fit": "K-pop",
         "scores": {}
       },
       "rank": 5
@@ -2437,15 +2381,15 @@
     {
       "segment": "top",
       "rank": 1,
-      "vo": "第1名，Urban街舞，来自 milkhater05。",
+      "vo": "第1名，K-pop街舞 圆佑 stage，来自 一颗圆佑弹。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
       "on_screen": {
-        "stars": 3,
+        "stars": 4,
         "tag": "本周No.1",
         "core_moves": [
-          "Urban"
+          "K-pop"
         ]
       },
       "beginner_tip": ""
@@ -2501,15 +2445,15 @@
     {
       "segment": "top",
       "rank": 5,
-      "vo": "第5名，Urban街舞，来自 user583413340。",
+      "vo": "第5名，K-pop街舞 NCT127 中本悠太，来自 爆爆大王。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
       "on_screen": {
-        "stars": 3,
+        "stars": 4,
         "tag": "本周No.5",
         "core_moves": [
-          "Urban"
+          "K-pop"
         ]
       },
       "beginner_tip": ""
@@ -2550,7 +2494,9 @@
     "vo_template_classic": "特别加映，{dance_type}街舞{title}，来自 {creator}。"
   },
   "deleted_ids": [
+    "7661708737119358228",
     "7662369791218322696",
+    "7662870808104127775",
     "c9"
   ]
 }

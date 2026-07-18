@@ -76,7 +76,7 @@ def iso_week() -> str:
     return f"{year}-W{week:02d}"
 
 
-WEEK_ID = re.compile(r"\d{4}-W\d{2}(?:-[AB])?$")
+WEEK_ID = re.compile(r"\d{4}-W\d{2}(?:-[A-Z])?$")
 
 
 def config_path(week: str) -> Path:
