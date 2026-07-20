@@ -59,13 +59,21 @@ def on_resp(resp):
         captured[aid] = (play, aw)
         print(f"  captured {aid}")
 
+import random as _random
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from human import idle, cooldown, wiggle_cursor, human_scroll
+
 with sync_playwright() as p:
     browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
     ctx = browser.contexts[0]
     page = ctx.new_page()
     page.on("response", on_resp)
 
-    for pk in picks:
+    # 洗牌 picks 顺序 + 每支之间冷却, 拟人化
+    picks_shuffled = list(picks); _random.shuffle(picks_shuffled)
+    consecutive_fail = 0
+    for pk_i, pk in enumerate(picks_shuffled):
         cand = by_id[pk["id"]]
         url = cand["url"]
         vid = re.search(r"/video/(\d+)", url).group(1)
@@ -76,17 +84,35 @@ with sync_playwright() as p:
             print(f"[skip] {stem}.mp4"); continue
 
         print(f"\n════ #{pk.get('rank')} {cand.get('creator','')} — {url}")
+        # 从首页出发, 有 referer
+        if "douyin.com" not in (page.url or ""):
+            try: page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
+            except Exception: pass
+            idle(2.0, 4.5); wiggle_cursor(page)
+            human_scroll(page, total=_random.randint(600, 1400))
+            idle(1.0, 2.5)
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=45000)
         except Exception as e:
             print(f"  goto err: {e}")
+        # 拟人化: 页面上先滚动/停留, 才等 aweme/detail
+        idle(1.5, 3.5)
+        try: human_scroll(page, total=_random.randint(300, 800))
+        except Exception: pass
         for _ in range(24):
             if vid in captured: break
-            time.sleep(0.5)
+            time.sleep(_random.uniform(0.4, 0.8))
         pair = captured.get(vid)
         if not pair:
             print(f"  ✗ no aweme/detail response for {vid}")
+            consecutive_fail += 1
+            if consecutive_fail >= 3:
+                print("  连续 3 支拿不到详情, 疑似风控, 长冷却 5-10 分后跳出")
+                time.sleep(_random.uniform(300, 600))
+                break
+            cooldown(45, 120)
             continue
+        consecutive_fail = 0
         play, aw = pair
         if play.startswith("//"): play = "https:" + play
 
@@ -114,5 +140,8 @@ with sync_playwright() as p:
         }
         meta_out.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
         print(f"  ✓ {size//1024}KB, author={author}, duration={duration}s")
+        # 每支 pick 之间冷却
+        if pk_i < len(picks_shuffled) - 1:
+            cooldown(30, 90)
 
 print("\n═══ done ═══")

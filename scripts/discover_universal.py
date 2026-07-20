@@ -14,13 +14,17 @@ Writes:
   dl2/<platform>_<id>.{mp4,json}  (downloaded top N)
 """
 from __future__ import annotations
-import argparse, json, re, subprocess, time, datetime as dt
+import argparse, json, re, random, subprocess, time, datetime as dt
 from pathlib import Path
 from urllib.parse import quote
 
 from playwright.sync_api import sync_playwright
 
 REPO = Path(__file__).resolve().parents[1]
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from human import (jitter_sleep, idle, cooldown, wiggle_cursor,
+                   human_scroll, human_search)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--week", required=True)
@@ -144,15 +148,18 @@ def probe_duration(mp4: Path) -> int:
 
 # ── per-platform discover ──
 def discover_xhs(page, kw: str, per_kw: int) -> list[dict]:
-    page.goto(f"https://www.xiaohongshu.com/search_result/?keyword={quote(kw)}&type=51",
-              timeout=45000, wait_until="domcontentloaded")
-    time.sleep(3)
+    human_search(page, "https://www.xiaohongshu.com",
+                 "https://www.xiaohongshu.com/search_result/?keyword={kw}&type=51",
+                 kw, search_input_selector='input[placeholder*="搜索"], input#search-input')
     try:
         loc = page.get_by_text("视频", exact=True)
-        if loc.count(): loc.last.click(); time.sleep(2)
+        if loc.count():
+            loc.last.click(); idle(1.5, 3.0)
     except Exception: pass
-    for _ in range(4):
-        page.mouse.wheel(0, 2000); time.sleep(0.9)
+    for _ in range(random.randint(3, 5)):
+        human_scroll(page, total=random.randint(1400, 2400))
+        idle(0.6, 1.6)
+    wiggle_cursor(page)
     cards = page.locator("a").evaluate_all("""anchors => anchors
         .filter(a => a.href.includes('/search_result/') && a.href.includes('xsec_token'))
         .map(a => {
@@ -186,11 +193,13 @@ def discover_xhs(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_tiktok(page, kw: str, per_kw: int) -> list[dict]:
-    page.goto(f"https://www.tiktok.com/search?q={quote(kw)}",
-              timeout=40000, wait_until="domcontentloaded")
-    time.sleep(5)
-    for _ in range(3):
-        page.mouse.wheel(0, 2000); time.sleep(1.0)
+    human_search(page, "https://www.tiktok.com",
+                 "https://www.tiktok.com/search?q={kw}",
+                 kw, search_input_selector='input[type="search"], input[placeholder*="Search"]')
+    for _ in range(random.randint(2, 4)):
+        human_scroll(page, total=random.randint(1600, 2400))
+        idle(0.8, 2.0)
+    wiggle_cursor(page)
     cards = page.locator('a[href*="/video/"]').evaluate_all("""anchors => anchors.map(a => {
         const card = a.closest('div[class*=DivItemContainer], article') || a.parentElement;
         return { href: a.href, text: (card?.innerText||'').slice(0,400) };
@@ -219,11 +228,13 @@ def discover_tiktok(page, kw: str, per_kw: int) -> list[dict]:
 
 def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
     # sp=EgIIBQ%3D%3D = "this week" filter
-    page.goto(f"https://www.youtube.com/results?search_query={quote(kw)}&sp=EgIIBQ%253D%253D",
-              timeout=40000, wait_until="domcontentloaded")
-    time.sleep(4)
-    for _ in range(3):
-        page.mouse.wheel(0, 2500); time.sleep(1.0)
+    human_search(page, "https://www.youtube.com",
+                 "https://www.youtube.com/results?search_query={kw}&sp=EgIIBQ%253D%253D",
+                 kw, search_input_selector='input#search, input[name="search_query"]')
+    for _ in range(random.randint(2, 4)):
+        human_scroll(page, total=random.randint(1800, 2800))
+        idle(0.7, 1.9)
+    wiggle_cursor(page)
     cards = page.locator("ytd-video-renderer, ytd-rich-item-renderer").evaluate_all("""renderers =>
         renderers.map(r => {
             const a = r.querySelector('a#video-title, a#thumbnail');
@@ -262,11 +273,13 @@ def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_instagram(page, kw: str, per_kw: int) -> list[dict]:
-    page.goto(f"https://www.instagram.com/explore/search/keyword/?q={quote(kw)}",
-              timeout=40000, wait_until="domcontentloaded")
-    time.sleep(5)
-    for _ in range(3):
-        page.mouse.wheel(0, 2000); time.sleep(1.0)
+    human_search(page, "https://www.instagram.com",
+                 "https://www.instagram.com/explore/search/keyword/?q={kw}",
+                 kw, search_input_selector='input[placeholder*="Search"], input[aria-label*="Search"]')
+    for _ in range(random.randint(2, 4)):
+        human_scroll(page, total=random.randint(1400, 2400))
+        idle(0.8, 2.0)
+    wiggle_cursor(page)
     cards = page.locator('a[href*="/reel/"], a[href*="/p/"]').evaluate_all("""anchors =>
         anchors.map(a => {
             const img = a.querySelector('img');
@@ -288,11 +301,13 @@ def discover_instagram(page, kw: str, per_kw: int) -> list[dict]:
 
 def discover_bilibili(page, kw: str, per_kw: int) -> list[dict]:
     # &order=click 按播放, &order=stow 按收藏, &order=pubdate 按发布, &duration=1 短
-    page.goto(f"https://search.bilibili.com/video?keyword={quote(kw)}&order=click",
-              timeout=40000, wait_until="domcontentloaded")
-    time.sleep(4)
-    for _ in range(3):
-        page.mouse.wheel(0, 2000); time.sleep(0.8)
+    human_search(page, "https://www.bilibili.com",
+                 "https://search.bilibili.com/video?keyword={kw}&order=click",
+                 kw, search_input_selector='input.nav-search-input, input[placeholder*="搜索"]')
+    for _ in range(random.randint(2, 4)):
+        human_scroll(page, total=random.randint(1400, 2200))
+        idle(0.6, 1.6)
+    wiggle_cursor(page)
     cards = page.locator(".video-list-item, .bili-video-card").evaluate_all("""items =>
         items.map(it => {
             const a = it.querySelector('a[href*="/video/BV"]');
@@ -325,11 +340,14 @@ def discover_bilibili(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_douyin(page, kw: str, per_kw: int) -> list[dict]:
-    page.goto(f"https://www.douyin.com/search/{quote(kw)}?type=video",
-              timeout=40000, wait_until="domcontentloaded")
-    time.sleep(5)
-    for _ in range(3):
-        page.mouse.wheel(0, 2000); time.sleep(1.0)
+    # 抖音风控最狠 -> 从首页搜索 + 更慢
+    human_search(page, "https://www.douyin.com",
+                 "https://www.douyin.com/search/{kw}?type=video",
+                 kw, search_input_selector='input[data-e2e="searchbar-input"], input[placeholder*="搜索"]')
+    for _ in range(random.randint(2, 4)):
+        human_scroll(page, total=random.randint(1400, 2200))
+        idle(1.0, 2.4)
+    wiggle_cursor(page)
     cards = page.locator('a[href*="/video/"]').evaluate_all("""anchors => anchors.map(a => {
         const card = a.closest('li, div[class*=result]') || a.parentElement?.parentElement;
         return { href: a.href, text: (card?.innerText||'').slice(0,400) };
@@ -387,14 +405,19 @@ pools: dict[str, list[dict]] = {p: [] for p in platforms}
 with sync_playwright() as p_ctx:
     b = p_ctx.chromium.connect_over_cdp("http://127.0.0.1:9222")
     ctx = b.contexts[0]
-    for platform in platforms:
+    # 拟人化: 平台顺序随机, 关键词顺序随机, 每期只跑部分组合
+    platforms_shuffled = list(platforms)
+    random.shuffle(platforms_shuffled)
+    for platform in platforms_shuffled:
         fn = DISCOVERERS.get(platform)
         if not fn:
             print(f"[{platform}] no discoverer, skip"); continue
         page = ctx.new_page()
         consecutive_fail = 0
         try:
-            for kw in keywords:
+            kws_shuffled = list(keywords)
+            random.shuffle(kws_shuffled)
+            for kw_i, kw in enumerate(kws_shuffled):
                 try:
                     got = fn(page, kw, args.per_keyword)
                     print(f"[{platform}] {kw!r} -> {len(got)} cards", flush=True)
@@ -407,11 +430,17 @@ with sync_playwright() as p_ctx:
                     print(f"[{platform}] {kw!r} failed: {e.__class__.__name__}: {str(e)[:80]}", flush=True)
                     consecutive_fail += 1
                 if consecutive_fail >= 2:
-                    print(f"[{platform}] aborting after {consecutive_fail} consecutive failures (likely verify/captcha)", flush=True)
+                    print(f"[{platform}] STOP: {consecutive_fail} 连续失败, 疑似被风控, 长冷却 5-10 分", flush=True)
+                    time.sleep(random.uniform(300, 600))
                     break
+                # 关键词之间: 短冷却 (拟人)
+                if kw_i < len(kws_shuffled) - 1:
+                    cooldown(min_s=25, max_s=75)
         finally:
             try: page.close()
             except Exception: pass
+        # 平台之间: 大冷却
+        cooldown(min_s=90, max_s=240)
 
 # ── rank + save candidates ──
 def rank_key(c):

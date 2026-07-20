@@ -22,6 +22,7 @@
 from __future__ import annotations
 import argparse
 import json
+import random
 import re
 import sys
 import time
@@ -83,6 +84,12 @@ def find_or_open_upload_page(ctx):
             x.goto(UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
             return x
     pg = ctx.new_page()
+    # 先访问 creator 首页 -> 有 referer / session 再到 upload
+    try:
+        pg.goto("https://creator.douyin.com/", wait_until="domcontentloaded", timeout=30_000)
+        time.sleep(random.uniform(1.5, 3.0))
+    except Exception:
+        pass
     pg.goto(UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
     return pg
 
@@ -103,16 +110,29 @@ def push_file_via_cdp(ctx, pg, mp4: Path):
     )
 
 
+def _human_type(pg, text: str):
+    for i, ch in enumerate(text):
+        pg.keyboard.type(ch)
+        d = random.uniform(0.05, 0.16)
+        if i > 0 and i % random.randint(6, 14) == 0:
+            d += random.uniform(0.2, 0.5)
+        time.sleep(d)
+
+
 def fill_metadata(pg, title: str, desc: str):
-    # 标题：普通 input
+    # 标题：普通 input, 逐字符输入
     ti = pg.locator('input[placeholder*="标题"]').first
     ti.click()
-    ti.fill(title)
+    time.sleep(random.uniform(0.3, 0.6))
+    pg.keyboard.press("Meta+A"); time.sleep(0.1)
+    pg.keyboard.press("Backspace"); time.sleep(random.uniform(0.2, 0.4))
+    _human_type(pg, title)
     # 简介：contenteditable，不能 .fill()，必须 keyboard.type()
-    time.sleep(0.5)
+    time.sleep(random.uniform(0.6, 1.2))
     desc_el = pg.locator('[contenteditable="true"]').first
     desc_el.click()
-    pg.keyboard.type(desc)
+    time.sleep(random.uniform(0.3, 0.6))
+    _human_type(pg, desc)
 
 
 def main():
