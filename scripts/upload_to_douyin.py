@@ -51,21 +51,21 @@ def build_title(week: str) -> str:
 
 
 def build_description(cfg: dict, title: str) -> str:
+    """描述里不放跨平台 URL/字眼(只留 @作者), 抖音简介不允许外链导流也更干净。"""
     picks = cfg.get("picks", [])
     sp = cfg.get("classic_comeback", {}) or {}
     lines = [
         title,
         "",
-        "跨平台精选本周编舞，你最喜欢哪一支？",
+        "本周编舞精选，你最喜欢哪一支？",
         "",
         "本期排行榜：",
     ]
     for i, p in enumerate(picks, 1):
         creator = p.get("creator", "").strip() or "@待补充"
-        url = p.get("url", "").strip()
-        lines.append(f"{i}. {creator}  {url}")
-    if sp.get("creator") or sp.get("url"):
-        lines.append(f"特别加映： {sp.get('creator','').strip()}  {sp.get('url','').strip()}")
+        lines.append(f"{i}. {creator}")
+    if sp.get("creator"):
+        lines.append(f"特别加映： {sp.get('creator','').strip()}")
     lines += ["", "#热舞榜 #编舞 #街舞 #dance #BestDancer"]
     return "\n".join(lines)
 

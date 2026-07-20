@@ -300,8 +300,8 @@ function buildVideoDescription() {
   const list = ranked.map((item, index) => {
     const prefix = index < 5 ? `${index + 1}.` : "特别加映：";
     const creator = item.creator || "原作者待补充";
-    const url = item.url || "原链接待补充";
-    return `${prefix} ${creator}  ${url}`;
+    // 用户 2026-07 要求: 描述里不出现其他平台字眼(URL) — 只留 @作者
+    return `${prefix} ${creator}`;
   }).join("\n");
   return `${week}热舞又来啦！这周的编舞里，有没有一支让你忍不住想跟跳？\n\n本期排行榜：\n${list}\n\n#热舞榜 #编舞 #街舞 #BestDancer`;
 }
@@ -342,6 +342,18 @@ async function load() { state=await api(`/api/state?week=${encodeURIComponent($(
     if (pickStars[c.id] != null) { c.difficulty = c.difficulty || {}; c.difficulty.stars = pickStars[c.id]; }
   });
   syncEdition(); const settings=state.settings; $("#keywords").value=settings.keywords.join("\n"); $("#top-limit").value=settings.top_limit; $("#min-likes").value=settings.min_likes || 0; $("#recent-days").value=settings.recent_days || 7; $("#sort-by").value=settings.sort_by || "heat_desc"; $("#videos-only").checked=settings.videos_only !== false; renderPlatforms(settings.platforms || ["douyin"]); renderCandidates(); $("#video-description").value=state.config.metadata?.video_description || buildVideoDescription();
+  // 成片预览: 有 demo 就显示播放器 + 元数据(大小+修改时间)
+  const demoBlock=$("#video-preview-block"), demoPlayer=$("#video-preview-player"), demoMeta=$("#video-preview-meta");
+  if (state.demo) {
+    const mb=(state.demo.size/1024/1024).toFixed(1);
+    const dt=new Date(state.demo.mtime*1000).toLocaleString();
+    demoMeta.textContent=`${mb} MB · 生成于 ${dt}`;
+    // cache-bust: mtime 变了强制重新加载
+    demoPlayer.src=`${state.demo.url}?t=${state.demo.mtime}`;
+    demoBlock.hidden=false;
+  } else {
+    demoBlock.hidden=true; demoPlayer.removeAttribute("src");
+  }
   // 全局设置回填
   const m=state.config.metadata||{};
   if($("#global-voice")) $("#global-voice").value = m.global_voice || "zh-CN-XiaoyiNeural";

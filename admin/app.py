@@ -578,11 +578,31 @@ class App(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if parsed.path.startswith("/output/") and parsed.path.endswith("_demo.mp4"):
+            # 成片直传, 让 dashboard 里的 <video> 能播
+            fname = parsed.path.rsplit("/", 1)[-1]
+            fpath = REPO / "output" / fname
+            if not fpath.exists():
+                self.send_error(404); return
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Length", str(fpath.stat().st_size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            with open(fpath, "rb") as f:
+                self.wfile.write(f.read())
+            return
         if parsed.path == "/api/state":
             week = (parsed.query.split("week=", 1)[-1] or iso_week()).split("&", 1)[0]
             config = load_config(week)
+            demo_path = REPO / "output" / f"{week}_demo.mp4"
+            demo_info = None
+            if demo_path.exists():
+                st = demo_path.stat()
+                demo_info = {"url": f"/output/{week}_demo.mp4", "size": st.st_size, "mtime": int(st.st_mtime)}
             self.send_json({"week": week, "config": config, "settings": load_settings(),
-                            "selected": selected_ids(config), "jobs": list(JOBS.values())[-5:]})
+                            "selected": selected_ids(config), "jobs": list(JOBS.values())[-5:],
+                            "demo": demo_info})
             return
         if parsed.path == "/api/workspaces":
             recent = int(parse_qs(parsed.query).get("recent", [12])[0])
