@@ -46,7 +46,7 @@ def build_title(week: str) -> str:
            "十一","十二","十三","十四","十五","十六","十七","十八","十九","二十",
            "二十一","二十二","二十三","二十四","二十五","二十六"]
     ed_part = f"·第{ORD[ord(letter)-65]}篇" if letter else ""
-    title = f"{yr}年第{wn}周热舞榜{ed_part}｜跨平台编舞精选"
+    title = f"{yr}年第{wn}周热舞榜{ed_part}｜本周编舞精选"
     return title[:30]
 
 

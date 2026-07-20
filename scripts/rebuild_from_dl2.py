@@ -120,7 +120,7 @@ classics = [c for c in candidates if c["id"].startswith("k")]
 
 cfg = {
     "_readme": "auto: cross-platform complete adult choreography, real authors",
-    "episode": {"week": WEEK, "theme": "跨平台完整编舞精选",
+    "episode": {"week": WEEK, "theme": "本周编舞精选",
                 "platforms": sorted(platforms_used), "voice": "young_female",
                 "top_n": 5, "classic_n": 1},
     "this_week_candidates": this_week,
