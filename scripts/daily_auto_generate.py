@@ -25,25 +25,27 @@ def iso_week() -> str:
 
 
 def used_urls(exclude_week: str) -> set[str]:
-    """收集需要排除的 URL: 黑名单 + '同 ISO 周内其他 edition' 已用.
-    跨周(如 W30-*) 不算数, 让 W31-* 可以复用 W30 素材(隔一周对观众是新内容)."""
+    """收集需要排除的 URL: 黑名单 + **所有其他期**已用的 URL.
+    严格跨期去重, 一旦某支被用过就再也不能被下一期挑到 (哪怕跨 ISO 周).
+    观众看的是连续几期, 隔一周复用素材会被一眼识破."""
     used = set(json.load(open(BL))["urls"])
-    # exclude_week: '2026-W31-B' -> week_prefix='2026-W31'
-    week_prefix = exclude_week.rsplit("-", 1)[0] if exclude_week.count("-") >= 2 else exclude_week
-    for p in WEEKLY.glob("*.json"):
+    for p in WEEKLY.glob("????-W??*.json"):
         if p.stem == exclude_week: continue
-        if not p.stem.startswith(week_prefix): continue  # 仅同 ISO 周
         try: c = json.load(open(p))
         except Exception: continue
+        # picks 的 url 可能不在 pick 对象上, 得回查候选池
+        bi = {x.get("id"): x for x in c.get("this_week_candidates", []) + c.get("classics_pool", [])}
         for pk in c.get("picks", []):
             if pk.get("url"): used.add(pk["url"])
-            for u in pk.get("source_urls", []) or []:
+            u = bi.get(pk.get("id"), {}).get("url", "")
+            if u: used.add(u)
+            for u in (pk.get("source_urls") or []):
                 if u: used.add(u)
         sp = c.get("classic_comeback") or {}
         if sp.get("url"): used.add(sp["url"])
-        for pk in sp.get("picks", []) if isinstance(sp, dict) else []:
-            for u in (pk.get("source_urls") or []):
-                if u: used.add(u)
+        if sp.get("id"):
+            u = bi.get(sp["id"], {}).get("url", "")
+            if u: used.add(u)
     return used
 
 def probe_dur(mp4: Path) -> float:
@@ -126,7 +128,11 @@ def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
     opts.sort(key=lambda t: -t[0])
 
     if len(opts) < 5:
-        raise SystemExit(f"合规候选不足 5 支 (只有 {len(opts)} 支). 需先补 discover/download.")
+        raise SystemExit(
+            f"合规候选不足 5 支 (只有 {len(opts)} 支). 素材池被跨期严格去重耗尽 —— "
+            f"请手动跑 scripts/discover_universal.py + 下载新素材再重试. "
+            f"注意抓取要走 scripts/human.py 拟人化流程避免风控."
+        )
 
     top = opts[:5]
     warnings = []
