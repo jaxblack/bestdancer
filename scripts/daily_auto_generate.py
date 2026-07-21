@@ -120,6 +120,9 @@ def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
     tpl_p = next((WEEKLY / n for n in [f"{week}-A.json", "2026-W30-A.json"] if (WEEKLY / n).exists()), pool_p)
     cfg = copy.deepcopy(json.load(open(tpl_p)))
     cfg["week"] = target
+    # 关键 bug 防护: episode.week 也要同步, 不然 intro_vo 会读到模板的旧 week/edition
+    if "episode" in cfg and isinstance(cfg["episode"], dict):
+        cfg["episode"]["week"] = target
     cfg["this_week_candidates"] = [copy.deepcopy(x) for x in a.get("this_week_candidates", []) if x.get("url","") not in used]
     cfg["classics_pool"] = [copy.deepcopy(x) for x in a.get("classics_pool", []) if x.get("url","") not in used]
     cfg["deleted_ids"] = []
