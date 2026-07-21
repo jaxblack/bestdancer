@@ -25,23 +25,26 @@ def iso_week() -> str:
 
 
 def used_urls(exclude_week: str) -> set[str]:
+    """收集需要排除的 URL: 黑名单 + '同 ISO 周内其他 edition' 已用.
+    跨周(如 W30-*) 不算数, 让 W31-* 可以复用 W30 素材(隔一周对观众是新内容)."""
     used = set(json.load(open(BL))["urls"])
-    for p in WEEKLY.glob("????-W??*.json"):
-        if p.stem == exclude_week:
-            continue
-        cfg = json.load(open(p))
-        bi = {x["id"]: x for x in cfg.get("this_week_candidates", []) + cfg.get("classics_pool", [])}
-        for pk in cfg.get("picks", []):
+    # exclude_week: '2026-W31-B' -> week_prefix='2026-W31'
+    week_prefix = exclude_week.rsplit("-", 1)[0] if exclude_week.count("-") >= 2 else exclude_week
+    for p in WEEKLY.glob("*.json"):
+        if p.stem == exclude_week: continue
+        if not p.stem.startswith(week_prefix): continue  # 仅同 ISO 周
+        try: c = json.load(open(p))
+        except Exception: continue
+        for pk in c.get("picks", []):
             if pk.get("url"): used.add(pk["url"])
-            u = bi.get(pk["id"], {}).get("url", "")
-            if u: used.add(u)
-        sp = cfg.get("classic_comeback", {}) or {}
+            for u in pk.get("source_urls", []) or []:
+                if u: used.add(u)
+        sp = c.get("classic_comeback") or {}
         if sp.get("url"): used.add(sp["url"])
-        if sp.get("id"):
-            u = bi.get(sp["id"], {}).get("url", "")
-            if u: used.add(u)
+        for pk in sp.get("picks", []) if isinstance(sp, dict) else []:
+            for u in (pk.get("source_urls") or []):
+                if u: used.add(u)
     return used
-
 
 def probe_dur(mp4: Path) -> float:
     try:
