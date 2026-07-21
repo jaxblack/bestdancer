@@ -64,14 +64,28 @@ def source_pool() -> Path:
     return cands[0] if cands else None
 
 
-def next_edition(week: str) -> str:
-    """找第一个还没生成 demo 的 edition 字母."""
-    for letter in "ABCDEFGHIJKL":
-        demo = REPO / "output" / f"{week}-{letter}_demo.mp4"
-        cfg = WEEKLY / f"{week}-{letter}.json"
-        if not demo.exists() or not cfg.exists():
-            return letter
-    return "M"  # >=13 期就当异常, 保底不覆盖
+def next_target() -> tuple[str, str]:
+    """决定下一期 week+edition:
+    找已存在的 <week>-<L>.json 里最新的一个(按 week desc, letter desc),
+    然后 letter+1 (Z 到顶就 week+1 从 A 开始). 若一个都没有, 用 iso_week()+A.
+    """
+    import re as _re
+    entries = []
+    for p in WEEKLY.glob("????-W??-?.json"):
+        m = _re.match(r"(\d{4})-W(\d{1,2})-([A-Z])$", p.stem)
+        if m:
+            entries.append((int(m.group(1)), int(m.group(2)), m.group(3), p.stem))
+    if not entries:
+        return iso_week(), "A"
+    entries.sort(reverse=True)
+    yr, wn, letter, stem = entries[0]
+    if letter < "Z":
+        return f"{yr}-W{wn:02d}", chr(ord(letter) + 1)
+    # 满到 Z: 进入下一 ISO 周
+    import datetime as _dt
+    nxt = _dt.date.fromisocalendar(yr, wn, 1) + _dt.timedelta(days=7)
+    y2, w2, _ = nxt.isocalendar()
+    return f"{y2}-W{w2:02d}", "A"
 
 
 def all_downloaded() -> dict[str, Path]:
@@ -183,8 +197,7 @@ def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
 
 
 def main() -> None:
-    week = iso_week()
-    edition = next_edition(week)
+    week, edition = next_target()
     target = f"{week}-{edition}"
     print(f"[daily] target = {target}")
     try:
