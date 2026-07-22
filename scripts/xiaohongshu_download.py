@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import re
+import sys
 import time
 from pathlib import Path
 from urllib.parse import quote
 
 from playwright.sync_api import sync_playwright
+
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE))
+from human import (jitter_sleep, idle, cooldown, wiggle_cursor,
+                   human_scroll, human_search, visit_home_first)
 
 REPO = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -37,14 +44,26 @@ def capture_video_url(page, candidate: dict) -> str:
     page.on("response", observe)
     try:
         link = None
-        for query in (candidate["title"], "urban dance 编舞", "编舞 完整"):
-            search_url = f"https://www.xiaohongshu.com/search_result/?keyword={quote(query)}&type=51"
-            page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(2)
+        queries = [candidate["title"], "urban dance 编舞", "编舞 完整"]
+        random.shuffle(queries)  # 顺序不固定
+        for query in queries:
+            # 通过搜索框逐字输入而非 direct search URL
+            try:
+                human_search(page, "https://www.xiaohongshu.com",
+                             "https://www.xiaohongshu.com/search_result/?keyword={kw}&type=51",
+                             query, search_input_selector='input[placeholder*="搜索"], input#search-input')
+            except Exception:
+                page.goto(f"https://www.xiaohongshu.com/search_result/?keyword={quote(query)}&type=51",
+                          wait_until="domcontentloaded", timeout=60000)
+            idle(2.5, 5.0)  # 搜索出结果先看看
             video_tab = page.get_by_text("视频", exact=True)
             if video_tab.count():
                 video_tab.last.click(timeout=10000)
-                time.sleep(1.5)
+                idle(2.0, 4.0)
+            # 拟人化: 页面加载后先滚动几屏看内容, 才去找目标
+            for _ in range(random.randint(1, 3)):
+                human_scroll(page, total=random.randint(700, 1400))
+                idle(1.0, 2.5)
             matches = page.locator(f'a[href*="/explore/{target_note}"]')
             for index in range(matches.count()):
                 possible = matches.nth(index)
@@ -57,12 +76,14 @@ def capture_video_url(page, candidate: dict) -> str:
                 break
         if link is None:
             raise ValueError("搜索结果未找到原笔记；请在 Chrome 中确认仍可见")
+        wiggle_cursor(page, moves=2)
         link.click(timeout=15000, force=True)
         page.locator("video").first.wait_for(state="attached", timeout=30000)
+        idle(1.5, 3.5)  # 视频出现后停留 (拟人 "打开一支笔记看两秒")
         page.locator("video").first.click(position={"x": 4, "y": 4}, timeout=5000)
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + 25
         while not captured and time.monotonic() < deadline:
-            time.sleep(0.25)
+            time.sleep(random.uniform(0.2, 0.5))
         if not captured:
             raise ValueError("笔记已打开，但未捕获到 MP4 媒体请求")
         return captured[-1]
@@ -89,9 +110,15 @@ def main() -> int:
         context = browser.contexts[0]
         page = context.new_page()
         try:
-            for candidate in selected:
+            # 洗牌下载顺序 (拟人 —— 不按候选池排序批量抓)
+            selected_shuffled = list(selected)
+            random.shuffle(selected_shuffled)
+            consecutive_fail = 0
+            for idx, candidate in enumerate(selected_shuffled):
                 try:
                     media_url = capture_video_url(page, candidate)
+                    # 请求响应之间也别秒发, 拟人有个"启动播放器"的间隔
+                    idle(1.0, 2.5)
                     response = context.request.get(media_url, timeout=120000)
                     if not response.ok:
                         raise ValueError(f"媒体下载失败: HTTP {response.status}")
@@ -104,9 +131,18 @@ def main() -> int:
                     candidate["local_path"] = str(destination.relative_to(REPO))
                     candidate["download_status"] = "downloaded"
                     print(f"downloaded {candidate['id']} -> {destination.relative_to(REPO)}", flush=True)
+                    consecutive_fail = 0
                 except Exception as error:  # noqa: BLE001
                     failures.append(f"{candidate['id']}: {error}")
                     print(f"failed {candidate['id']}: {error}", flush=True)
+                    consecutive_fail += 1
+                    if consecutive_fail >= 3:
+                        print("连续 3 支失败, 疑似风控, 长冷却 5-10 分后终止", flush=True)
+                        time.sleep(random.uniform(300, 600))
+                        break
+                # 每支之间冷却 —— xhs 特别保守 60-180s
+                if idx < len(selected_shuffled) - 1:
+                    cooldown(60, 180)
         finally:
             page.close()
 

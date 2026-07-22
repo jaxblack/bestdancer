@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-07-22T22:30:10.277370",
+  "platforms": {
+    "douyin": 0,
+    "xiaohongshu": 125,
+    "instagram": 150,
+    "tiktok": 150
+  },
+  "keywords": [
+    "舞",
+    "urban",
+    "dance",
+    "编舞",
+    "kpop",
+    "hiphop"
+  ],
+  "pool_size": 100,
+  "recent_days_preference": 7
+}

@@ -148,18 +148,33 @@ def probe_duration(mp4: Path) -> int:
 
 # ── per-platform discover ──
 def discover_xhs(page, kw: str, per_kw: int) -> list[dict]:
+    # 小红书反爬升级得快 —— 比其他平台更保守:
+    # (1) 每次搜索前先在首页/发现页停留浏览 (拟人 "打开APP随便刷刷")
+    # (2) 慢速滚动次数少 (不贪多), 结束再逛几下探索页
+    try:
+        page.goto("https://www.xiaohongshu.com/explore", timeout=30000, wait_until="domcontentloaded")
+        idle(3.5, 7.0)  # 打开落地页停留
+        # 探索页刷几屏 (不涉及搜索, 纯浏览行为)
+        for _ in range(random.randint(1, 3)):
+            human_scroll(page, total=random.randint(800, 1600))
+            idle(1.5, 4.0)
+        wiggle_cursor(page, moves=random.randint(2, 4))
+    except Exception:
+        pass
     human_search(page, "https://www.xiaohongshu.com",
                  "https://www.xiaohongshu.com/search_result/?keyword={kw}&type=51",
                  kw, search_input_selector='input[placeholder*="搜索"], input#search-input')
+    idle(2.0, 4.5)  # 搜索出结果后先看一会儿
     try:
         loc = page.get_by_text("视频", exact=True)
         if loc.count():
-            loc.last.click(); idle(1.5, 3.0)
+            loc.last.click(); idle(2.0, 4.5)
     except Exception: pass
-    for _ in range(random.randint(3, 5)):
-        human_scroll(page, total=random.randint(1400, 2400))
-        idle(0.6, 1.6)
-    wiggle_cursor(page)
+    # 滚动次数少而慢, 每次拉动量小
+    for _ in range(random.randint(2, 4)):
+        human_scroll(page, total=random.randint(900, 1600))
+        idle(1.2, 3.2)
+    wiggle_cursor(page, moves=random.randint(2, 3))
     cards = page.locator("a").evaluate_all("""anchors => anchors
         .filter(a => a.href.includes('/search_result/') && a.href.includes('xsec_token'))
         .map(a => {
@@ -433,9 +448,12 @@ with sync_playwright() as p_ctx:
                     print(f"[{platform}] STOP: {consecutive_fail} 连续失败, 疑似被风控, 长冷却 5-10 分", flush=True)
                     time.sleep(random.uniform(300, 600))
                     break
-                # 关键词之间: 短冷却 (拟人)
+                # 关键词之间: 短冷却 (拟人); xhs 更保守 (它反爬升级快)
                 if kw_i < len(kws_shuffled) - 1:
-                    cooldown(min_s=25, max_s=75)
+                    if platform == "xiaohongshu":
+                        cooldown(min_s=60, max_s=180)
+                    else:
+                        cooldown(min_s=25, max_s=75)
         finally:
             try: page.close()
             except Exception: pass
