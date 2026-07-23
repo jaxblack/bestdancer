@@ -59,7 +59,7 @@ def _resolve_list(cli_val: str | None, key: str, fallback: list[str]) -> list[st
     return fallback
 
 RESOLVED_PLATFORMS = _resolve_list(args.platforms, "platforms",
-    ["xiaohongshu","tiktok","youtube","instagram","bilibili","douyin"])
+    ["tiktok","youtube","instagram","bilibili","douyin"])  # xhs 已停用 (2026-07)
 RESOLVED_KEYWORDS = _resolve_list(args.keywords, "keywords",
     ["urban dance choreography","hiphop 编舞","kpop dance cover","jazz 编舞","street dance","choreography"])
 if args.recent_days is None:
