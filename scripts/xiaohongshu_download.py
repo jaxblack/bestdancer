@@ -26,7 +26,8 @@ args = parser.parse_args()
 
 
 def note_id(url: str) -> str:
-    match = re.search(r"/explore/([0-9a-f]+)", url, re.I)
+    # 兼容 /explore/<id> 和 /search_result/<id> 两种 URL
+    match = re.search(r"/(?:explore|search_result)/([0-9a-f]+)", url, re.I)
     return match.group(1) if match else ""
 
 
@@ -34,6 +35,7 @@ def capture_video_url(page, candidate: dict) -> str:
     target_note = note_id(candidate.get("url", ""))
     if not target_note:
         raise ValueError("候选链接不是小红书笔记")
+    original_url = candidate.get("url", "")
     captured: list[str] = []
 
     def observe(response) -> None:
@@ -43,50 +45,68 @@ def capture_video_url(page, candidate: dict) -> str:
 
     page.on("response", observe)
     try:
-        link = None
-        queries = [candidate["title"], "urban dance 编舞", "编舞 完整"]
-        random.shuffle(queries)  # 顺序不固定
-        for query in queries:
-            # 通过搜索框逐字输入而非 direct search URL
-            try:
-                human_search(page, "https://www.xiaohongshu.com",
-                             "https://www.xiaohongshu.com/search_result/?keyword={kw}&type=51",
-                             query, search_input_selector='input[placeholder*="搜索"], input#search-input')
-            except Exception:
-                page.goto(f"https://www.xiaohongshu.com/search_result/?keyword={quote(query)}&type=51",
-                          wait_until="domcontentloaded", timeout=60000)
-            idle(2.5, 5.0)  # 搜索出结果先看看
-            video_tab = page.get_by_text("视频", exact=True)
-            if video_tab.count():
-                video_tab.last.click(timeout=10000)
-                idle(2.0, 4.0)
-            # 拟人化: 页面加载后先滚动几屏看内容, 才去找目标
-            for _ in range(random.randint(1, 3)):
-                human_scroll(page, total=random.randint(700, 1400))
+        # 拟人化: 先在探索页停留 (打开APP), 再直接从候选 URL 打开这条笔记.
+        # 走搜索找目标太不稳定 (搜出来常常没有目标笔记), 且高频搜索反而更像 bot.
+        # 真人常见操作: 收到链接 -> 打开 -> 看视频.
+        try:
+            page.goto("https://www.xiaohongshu.com/explore",
+                      wait_until="domcontentloaded", timeout=45000)
+            idle(2.5, 5.0)
+            for _ in range(random.randint(1, 2)):
+                human_scroll(page, total=random.randint(600, 1400))
                 idle(1.0, 2.5)
-            matches = page.locator(f'a[href*="/explore/{target_note}"]')
-            for index in range(matches.count()):
-                possible = matches.nth(index)
-                if possible.is_visible():
-                    link = possible
-                    break
-            if link is None and matches.count():
-                link = matches.last
-            if link is not None:
-                break
-        if link is None:
-            raise ValueError("搜索结果未找到原笔记；请在 Chrome 中确认仍可见")
-        wiggle_cursor(page, moves=2)
-        link.click(timeout=15000, force=True)
-        page.locator("video").first.wait_for(state="attached", timeout=30000)
-        idle(1.5, 3.5)  # 视频出现后停留 (拟人 "打开一支笔记看两秒")
-        page.locator("video").first.click(position={"x": 4, "y": 4}, timeout=5000)
+            wiggle_cursor(page, moves=2)
+        except Exception:
+            pass
+        # 打开笔记页. 优先用 /explore/<id> 格式 (笔记详情页, 直接有 video),
+        # 避免 /search_result/<id> 落到搜索页.
+        note_url = original_url
+        if "/search_result/" in note_url:
+            note_url = note_url.replace("/search_result/", "/explore/")
+        page.goto(note_url, wait_until="domcontentloaded", timeout=45000)
+        idle(2.5, 5.5)  # 看画面
+        # 找 video (笔记也可能是搜索结果页里嵌入了; 若还是搜索结果, 点进第一条)
+        video_loc = page.locator("video").first
+        try:
+            video_loc.wait_for(state="attached", timeout=15000)
+        except Exception:
+            # 兜底: 若还是搜索结果页, 尝试点这条笔记
+            try:
+                link = page.locator(f'a[href*="/explore/{target_note}"]').first
+                if link.count() == 0:
+                    link = page.locator(f'a[href*="{target_note}"]').first
+                link.click(timeout=8000, force=True)
+                idle(2.0, 4.0)
+                video_loc.wait_for(state="attached", timeout=20000)
+            except Exception:
+                raise ValueError("笔记页未出现 video 元素")
+        idle(1.5, 3.5)
+        # 优先: 直接从 <video src> 属性读 mp4 URL (笔记加载后就有, 无需 click).
+        # 这比模拟播放器 click 更拟人 (真人打开笔记就已经看到视频了) 且更稳.
+        try:
+            src = video_loc.get_attribute("src", timeout=3000) or ""
+            if src.endswith(".mp4") or ("sns-video" in src and ".mp4" in src):
+                return src
+        except Exception:
+            pass
+        # 兜底: click 播放器触发媒体请求 (force 避免叠层拦截)
+        try:
+            video_loc.click(position={"x": 4, "y": 4}, timeout=5000, force=True)
+        except Exception:
+            pass
         deadline = time.monotonic() + 25
         while not captured and time.monotonic() < deadline:
             time.sleep(random.uniform(0.2, 0.5))
-        if not captured:
-            raise ValueError("笔记已打开，但未捕获到 MP4 媒体请求")
-        return captured[-1]
+        if captured:
+            return captured[-1]
+        # 最后再试一次读 src
+        try:
+            src = video_loc.get_attribute("src", timeout=2000) or ""
+            if ".mp4" in src:
+                return src
+        except Exception:
+            pass
+        raise ValueError("已打开笔记, 但未捕获到 MP4 媒体请求")
     finally:
         page.remove_listener("response", observe)
 

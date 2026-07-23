@@ -1523,6 +1523,71 @@
         "fit": "街舞",
         "scores": {}
       }
+    },
+    {
+      "id": "c31",
+      "source": "小红书",
+      "platform": "xiaohongshu",
+      "url": "https://www.xiaohongshu.com/search_result/69d22e4a000000002301d7bd?xsec_token=ABICqrzuAcZp4SoRwXBvX_wXtOd6JJ5WC0e2ZaDtS4aWY=&xsec_source=",
+      "title": "舞蹈接力 KPOP男女团篇",
+      "creator": "@高飞飞",
+      "like": 123000,
+      "published_at": "2026-04-05",
+      "stars": 3,
+      "difficulty": "Medium",
+      "genre": "Kpop"
+    },
+    {
+      "id": "c32",
+      "source": "小红书",
+      "platform": "xiaohongshu",
+      "url": "https://www.xiaohongshu.com/search_result/678bcdf5000000001603cec1?xsec_token=ABuNLiIEQzPQR4EkQKv-e3Ij3uN5fwzj9zBAsYPRPWFcc=&xsec_source=",
+      "title": "感谢咪咪师傅～",
+      "creator": "@千千ya",
+      "like": 79000,
+      "published_at": "2025-01-18",
+      "stars": 3,
+      "difficulty": "Medium",
+      "genre": "Kpop"
+    },
+    {
+      "id": "c33",
+      "source": "小红书",
+      "platform": "xiaohongshu",
+      "url": "https://www.xiaohongshu.com/search_result/6830722e000000002102fe22?xsec_token=ABm17nBmn3JK_QlhsR-VcWmHrwFlHOEXicvFuEXFpy3vU=&xsec_source=",
+      "title": "🙋‍♀️跳了才知道编得有多爽",
+      "creator": "@会跳舞的千足虫",
+      "like": 6313,
+      "published_at": "2025-05-23",
+      "stars": 3,
+      "difficulty": "Medium",
+      "genre": "Kpop"
+    },
+    {
+      "id": "c34",
+      "source": "小红书",
+      "platform": "xiaohongshu",
+      "url": "https://www.xiaohongshu.com/search_result/67d50e5f000000001b0246d4?xsec_token=ABWGFxLOUZYmQjsNSv8cNu_ImQq-utapRx5_nvwbkKZjs=&xsec_source=",
+      "title": "有这么爽的舞进入Kpop…",
+      "creator": "@蛋丝儿不熬夜！",
+      "like": 6294,
+      "published_at": "2025-03-15",
+      "stars": 3,
+      "difficulty": "Medium",
+      "genre": "Kpop"
+    },
+    {
+      "id": "c35",
+      "source": "小红书",
+      "platform": "xiaohongshu",
+      "url": "https://www.xiaohongshu.com/search_result/68f309990000000007036968?xsec_token=ABfjcxtj0ivYTJBWFU2anEoo29HWw3f335LNVyhFqyhzA=&xsec_source=",
+      "title": "第二段也爽跳！babymonster wegoup",
+      "creator": "@汤圆圆圆周🦋",
+      "like": 4392,
+      "published_at": "2025-10-18",
+      "stars": 3,
+      "difficulty": "Medium",
+      "genre": "Kpop"
     }
   ],
   "classics_pool": [],

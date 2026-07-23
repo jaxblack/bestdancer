@@ -576,7 +576,7 @@ def main() -> int:
             except Exception as e2:  # noqa: BLE001
                 print(f"[warn] SAPI 也失败({e2})，出无声样片")
 
-    default_dur = {"intro": 3.5, "top": 15.0, "classic": 15.0, "outro": 6.0}
+    default_dur = {"intro": 3.5, "top": 14.0, "classic": 14.0, "outro": 6.0}
     min_dur = {"intro": 2.5, "top": 10.0, "classic": 10.0, "outro": 6.0}
     max_dur = {"intro": 5.0, "top": 20.0, "classic": 20.0, "outro": 8.0}
     timeline, t0, wavs = [], 0.0, []
