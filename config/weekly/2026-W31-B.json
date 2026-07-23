@@ -2,7 +2,7 @@
   "_readme": "auto: cross-platform complete adult choreography, real authors",
   "episode": {
     "week": "2026-W31-B",
-    "theme": "跨平台完整编舞精选",
+    "theme": "本周编舞精选",
     "platforms": [
       "douyin",
       "tiktok"
@@ -1743,7 +1743,7 @@
     {
       "segment": "top",
       "rank": 1,
-      "vo": "第1名，Hip-hop街舞 Big Dog Crew，来自 丸子土豆泥。",
+      "vo": "第1名，Kpop街舞 KPOP 男女团随机舞蹈接力，来自 @高飞飞。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
@@ -1751,7 +1751,7 @@
         "stars": 4,
         "tag": "本周No.1",
         "core_moves": [
-          "Hip-hop"
+          "Kpop"
         ]
       },
       "beginner_tip": ""
@@ -1759,45 +1759,13 @@
     {
       "segment": "top",
       "rank": 2,
-      "vo": "第2名，Jazz街舞，来自 Meiko_梅可。",
+      "vo": "第2名，Urban街舞 舞室双人齐舞，来自 @千千ya。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
       "on_screen": {
         "stars": 3,
         "tag": "本周No.2",
-        "core_moves": [
-          "Jazz"
-        ]
-      },
-      "beginner_tip": ""
-    },
-    {
-      "segment": "top",
-      "rank": 3,
-      "vo": "第3名，K-pop街舞 菠萝yy编舞，来自 HelloDance 菠萝yy。",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "subtitle": [],
-      "on_screen": {
-        "stars": 3,
-        "tag": "本周No.3",
-        "core_moves": [
-          "K-pop"
-        ]
-      },
-      "beginner_tip": ""
-    },
-    {
-      "segment": "top",
-      "rank": 4,
-      "vo": "第4名，Urban街舞 ICONIC BY MISTAKE，来自 汤圆💃。",
-      "voice": "zh-CN-XiaoyiNeural",
-      "voice_rate": "+20%",
-      "subtitle": [],
-      "on_screen": {
-        "stars": 3,
-        "tag": "本周No.4",
         "core_moves": [
           "Urban"
         ]
@@ -1806,16 +1774,48 @@
     },
     {
       "segment": "top",
-      "rank": 5,
-      "vo": "第5名，Jazz街舞，来自 _mo.on_。",
+      "rank": 3,
+      "vo": "第3名，Urban街舞 单人 girlish 编舞，来自 @会跳舞的千足虫。",
       "voice": "zh-CN-XiaoyiNeural",
       "voice_rate": "+20%",
       "subtitle": [],
       "on_screen": {
         "stars": 3,
+        "tag": "本周No.3",
+        "core_moves": [
+          "Urban"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "top",
+      "rank": 4,
+      "vo": "第4名，Hiphop街舞 双人 groove 编舞，来自 @蛋丝儿不熬夜！。",
+      "voice": "zh-CN-XiaoyiNeural",
+      "voice_rate": "+20%",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 3,
+        "tag": "本周No.4",
+        "core_moves": [
+          "Hiphop"
+        ]
+      },
+      "beginner_tip": ""
+    },
+    {
+      "segment": "top",
+      "rank": 5,
+      "vo": "第5名，Kpop街舞 BABYMONSTER〈WE GO UP〉翻跳，来自 @汤圆圆圆周🦋。",
+      "voice": "zh-CN-XiaoyiNeural",
+      "voice_rate": "+20%",
+      "subtitle": [],
+      "on_screen": {
+        "stars": 4,
         "tag": "本周No.5",
         "core_moves": [
-          "Jazz"
+          "Kpop"
         ]
       },
       "beginner_tip": ""
