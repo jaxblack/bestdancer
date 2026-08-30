@@ -9,8 +9,9 @@
   ],
   "platforms": [
     "douyin",
-    "instagram",
-    "tiktok"
+    "tiktok",
+    "youtube",
+    "instagram"
   ],
   "top_limit": 10,
   "min_likes": 0,

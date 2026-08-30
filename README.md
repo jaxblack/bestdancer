@@ -14,6 +14,41 @@ BestDancer 的目标不是某一个平台的热舞搬运或单站热榜，而是
 
 **这是推荐 + 教学，可以下载少量的视频内容**：只要保留原作者水印，署名并附原链接即可。合规红线详见 [prompts/00-variables.md](prompts/00-variables.md)。
 
+## 一条命令出一期（脚本化流程）
+
+```bash
+source .venv/bin/activate
+python3 scripts/auto_episode.py                 # 发现 → 下载 → 组稿 → 渲染 → 评估 → 闸门
+python3 scripts/auto_episode.py --skip-discover # 用现有候选池, 不再抓
+python3 scripts/auto_episode.py --threshold 85 --max-attempts 3
+python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发布分支
+```
+
+`auto_episode.py` 会自己做前置检查：CDP 调试 Chrome 没起来就用
+`~/.chrome-debug-profile` 拉一个（Chrome 136+ 在默认 profile 上会直接无视
+`--remote-debugging-port`，必须用独立 profile）。每一步都能单独 `--skip-*`，
+卡住不用从头再来。
+
+### 成片评估闸门
+
+```bash
+python3 pipeline/evaluate_demo.py 2026-W31-C --threshold 80
+python3 pipeline/evaluate_demo.py 2026-W31-C --no-llm   # 只跑硬指标
+```
+
+- **第一层（确定性）**：ffprobe 规格、`blackdetect` 黑屏、`freezedetect` 卡帧、
+  `silencedetect` 长静音、`ebur128` 响度，外加配置一致性——期号是否同步、名次是否连续、
+  入选舞段是否真落盘、口播是否报到画面上的作者和名次、有没有跨期复用素材。
+- **第二层（内容）**：按 `output/<week>_manifest.json` 渲染清单逐段抽帧，连同「这一段
+  画面上本来应该出现什么」一起交给本机 `codex exec`（`--image` 多模态 +
+  `--output-schema` 结构化输出），从 content_accuracy / visual_quality /
+  text_readability / pacing / hook_strength / compliance 六个维度打分并列出问题。
+
+总分低于阈值或出现 blocker 即不及格（退出码 1），报告写在
+`output/eval/<week>/report.md`。闸门是 **fail-closed** 的：要求跑内容评估却没跑成，
+一律按不及格处理，绝不放行。`codex` 不在 PATH 时会自动去 VS Code 扩展目录找，
+也可以用 `BESTDANCER_CODEX_BIN` 指定。
+
 ## 每期流程
 
 1. **候选发现 & 上传**（[06](prompts/06-trend-brief.md)）：抖音 / 小红书反爬时不自动抓取——把热门候选链接 / 热榜丢给助理整理成清单，按 `<id>__<source>__<slug>.mp4` 命名下载到 `assets/incoming/<week>/`，跑 `python pipeline/intake.py <week>` 入库。经典回归从自有旧舞库（`classics_pool`）选。

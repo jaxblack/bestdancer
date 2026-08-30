@@ -93,12 +93,28 @@ F_MID = load_font(52, True)
 F_CHIP = load_font(27, True)
 
 
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F000-\U0001FAFF"   # emoji / 补充符号
+    "\U00002600-\U000027BF"   # 杂项符号 + dingbats
+    "\U0000E000-\U0000F8FF"   # 私用区(平台自定义小图标, 最容易渲成方框)
+    "\U0000FE00-\U0000FE0F"   # 变体选择符
+    "\U0001F1E6-\U0001F1FF"   # 区域指示符(国旗)
+    "\U00002190-\U000021FF"   # 箭头
+    "\U00002B00-\U00002BFF"
+    "\U0000200D"              # ZWJ
+    "]+")
+
+
 def clean(s: str) -> str:
     if not s:
         return ""
     for junk in ["_示例", "（示例）", "(示例)", "示例编舞", "示例"]:
         s = s.replace(junk, "")
-    return s.strip()
+    # 抖音标题/昵称里全是 emoji 和私用区图标, 正文字体没有这些字形 -> 画面上是方框。
+    # 评估器在 2026-W31-B 上抓到过"顶部标题出现多个方框缺字"。
+    s = _EMOJI_RE.sub("", s)
+    return re.sub(r"\s{2,}", " ", s).strip()
 
 
 def sanitize_tts(vo: str) -> str:
@@ -694,6 +710,42 @@ def main() -> int:
                         "-i", str(bed_path), "-c:v", "copy",
                         "-c:a", "aac", "-b:a", "192k", "-shortest", str(final)], check=True)
     silent.unlink(missing_ok=True)
+
+    # 渲染清单: 每段的时间区间 + 该段"应该"出现的画面文字/口播。
+    # 评估脚本 (pipeline/evaluate_demo.py) 靠它把抽出来的帧对上预期,
+    # 才能判断"顶部作者/名次和真实画面对不对得上"这类内容错误。
+    manifest = {
+        "week": args.week,
+        "video": final.relative_to(REPO).as_posix(),
+        "total_sec": round(total_v, 3),
+        "fps": FPS,
+        "size": [W, H],
+        "voice_engine": engine,
+        "real_clip_segments": n_real,
+        "segments": [],
+    }
+    for i, e in enumerate(timeline):
+        s = e["seg"]
+        manifest["segments"].append({
+            "index": i,
+            "type": s["type"],
+            "start_sec": round(e["start"], 3),
+            "end_sec": round(e["start"] + e["adur"] + GAP, 3),
+            "candidate_id": s.get("cid"),
+            "rank": s.get("rank"),
+            "source_clip": e.get("src"),
+            "has_real_footage": bool(e.get("bg")),
+            "expect_on_screen": {
+                "tag": s.get("tag") or s.get("title1", ""),
+                "title": s.get("title", ""),
+                "creator": s.get("creator", ""),
+                "stars": s.get("stars", 0),
+                "caption": s.get("vo_caption", ""),
+            },
+            "vo": s.get("vo", ""),
+        })
+    manifest_path = out_dir / f"{args.week}_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # OpenClaw 只允许从 workspace 等安全目录发送附件；自动导出一份可点击版本。
     export_dir = Path.home() / ".openclaw" / "workspace" / "exports" / "bestdancer"

@@ -102,6 +102,36 @@ def clear_and_type(page, locator, text: str) -> None:
 
 # ── navigation ───────────────────────────────────────────
 
+def wait_for_cards(page, selector: str, timeout_s: float = 25.0,
+                   poll_s: float = 1.5, scroll_every: int = 3) -> int:
+    """等结果列表真正渲染出来再抓 DOM。
+
+    各平台搜索页都是懒加载 (抖音实测要 ~12s), 之前脚本 idle 几秒就 evaluate_all,
+    经常抓到 0 条被误判成"被风控"。这里轮询 selector 的数量, 期间偶尔滚一下
+    触发懒加载, 出现结果就立刻返回。返回最终匹配数量。
+    """
+    deadline = time.time() + timeout_s
+    rounds = 0
+    while time.time() < deadline:
+        try:
+            n = page.locator(selector).count()
+        except Exception:
+            n = 0
+        if n > 0:
+            return n
+        rounds += 1
+        if rounds % scroll_every == 0:
+            try:
+                page.mouse.wheel(0, random.randint(500, 1100))
+            except Exception:
+                pass
+        time.sleep(poll_s)
+    try:
+        return page.locator(selector).count()
+    except Exception:
+        return 0
+
+
 def visit_home_first(page, home_url: str, warmup_scrolls: int = 2) -> None:
     """先访问平台首页, scroll 一下模仿真人 warmup, 建立 referer / cookies。"""
     try:

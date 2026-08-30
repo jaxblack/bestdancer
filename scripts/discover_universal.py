@@ -24,7 +24,7 @@ REPO = Path(__file__).resolve().parents[1]
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from human import (jitter_sleep, idle, cooldown, wiggle_cursor,
-                   human_scroll, human_search)
+                   human_scroll, human_search, wait_for_cards)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--week", required=True)
@@ -78,7 +78,12 @@ DANCE = [(r"urban","Urban Dance"),(r"jazz|爵士","Jazz"),
          (r"hiphop|hip[- ]?hop|嘻哈","Hip-hop"),(r"popping|机械","Popping"),
          (r"locking","Locking"),(r"kpop|k-pop|女团|男团|翻跳|cover","K-pop"),
          (r"choreo|编舞","Choreography"),(r"dance|舞","Dance")]
-EXCLUDE = re.compile(r"tutorial|lesson|kids?|儿童|教学|分解|基础|入门|battle only", re.I)
+EXCLUDE = re.compile(
+    r"tutorial|lesson|kids?|儿童|教学|分解|基础|入门|battle only"
+    # 抖音泛关键词("舞"/"dance")会大量捞到这些非编舞内容, 评估器实测把它们
+    # 全判成 content_accuracy 不合格(画面是坐着比手势/资讯截图, 却标成 Urban 街舞)
+    r"|手势舞|口型|对口型|资讯|新闻|预告|花絮|直播回放|抽奖|带货|穿搭",
+    re.I)
 NAV = {"综合","用户","视频","直播","照片","For You","Following","Home","Shorts","Subscriptions","Library"}
 
 def infer_dance(text: str) -> str:
@@ -86,6 +91,30 @@ def infer_dance(text: str) -> str:
     for pat, name in DANCE:
         if re.search(pat, t): return name
     return "Street"
+
+
+def search_and_wait(page, label: str, home_url: str, search_url_tpl: str, kw: str,
+                    card_selector: str, input_selector: str, timeout_s: float = 30.0) -> int:
+    """拟人搜索 → 等结果渲染 → 渲染不出来就回退到规范搜索 URL 再等一次。
+
+    两个实测坑:
+      1. 结果懒加载 (抖音 ~12s), 之前 idle 几秒就抓 DOM, 常年 0 条被误判为风控;
+      2. 从首页搜索框回车, 抖音会落到 /jingxuan/search/<kw> 这个另一套版式,
+         里面根本没有 a[href*="/video/"], 必须回退到 /search/<kw>?type=video。
+    """
+    human_search(page, home_url, search_url_tpl, kw, search_input_selector=input_selector)
+    n = wait_for_cards(page, card_selector, timeout_s=timeout_s)
+    if n == 0:
+        try:
+            page.goto(search_url_tpl.format(kw=quote(kw)),
+                      wait_until="domcontentloaded", timeout=45_000)
+        except Exception:
+            pass
+        n = wait_for_cards(page, card_selector, timeout_s=timeout_s)
+        print(f"[{label}] {kw!r} 首页搜索版式无结果, 回退规范搜索 URL -> {n}", flush=True)
+    else:
+        print(f"[{label}] {kw!r} results rendered: {n}", flush=True)
+    return n
 
 def parse_compact_number(s: str) -> int:
     s = (s or "").strip().replace(",", "")
@@ -208,9 +237,10 @@ def discover_xhs(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_tiktok(page, kw: str, per_kw: int) -> list[dict]:
-    human_search(page, "https://www.tiktok.com",
-                 "https://www.tiktok.com/search?q={kw}",
-                 kw, search_input_selector='input[type="search"], input[placeholder*="Search"]')
+    search_and_wait(page, "tiktok", "https://www.tiktok.com",
+                    "https://www.tiktok.com/search?q={kw}", kw,
+                    'a[href*="/video/"]',
+                    'input[type="search"], input[placeholder*="Search"]')
     for _ in range(random.randint(2, 4)):
         human_scroll(page, total=random.randint(1600, 2400))
         idle(0.8, 2.0)
@@ -288,9 +318,10 @@ def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_instagram(page, kw: str, per_kw: int) -> list[dict]:
-    human_search(page, "https://www.instagram.com",
-                 "https://www.instagram.com/explore/search/keyword/?q={kw}",
-                 kw, search_input_selector='input[placeholder*="Search"], input[aria-label*="Search"]')
+    search_and_wait(page, "instagram", "https://www.instagram.com",
+                    "https://www.instagram.com/explore/search/keyword/?q={kw}", kw,
+                    'a[href*="/reel/"], a[href*="/p/"]',
+                    'input[placeholder*="Search"], input[aria-label*="Search"]')
     for _ in range(random.randint(2, 4)):
         human_scroll(page, total=random.randint(1400, 2400))
         idle(0.8, 2.0)
@@ -356,9 +387,10 @@ def discover_bilibili(page, kw: str, per_kw: int) -> list[dict]:
 
 def discover_douyin(page, kw: str, per_kw: int) -> list[dict]:
     # 抖音风控最狠 -> 从首页搜索 + 更慢
-    human_search(page, "https://www.douyin.com",
-                 "https://www.douyin.com/search/{kw}?type=video",
-                 kw, search_input_selector='input[data-e2e="searchbar-input"], input[placeholder*="搜索"]')
+    search_and_wait(page, "douyin", "https://www.douyin.com",
+                    "https://www.douyin.com/search/{kw}?type=video", kw,
+                    'a[href*="/video/"]',
+                    'input[data-e2e="searchbar-input"], input[placeholder*="搜索"]')
     for _ in range(random.randint(2, 4)):
         human_scroll(page, total=random.randint(1400, 2200))
         idle(1.0, 2.4)
@@ -416,6 +448,37 @@ platforms = RESOLVED_PLATFORMS
 keywords = RESOLVED_KEYWORDS
 print(f"Discovering across {platforms} with {len(keywords)} keywords, pool={args.pool_size}", flush=True)
 
+
+def rank_key(c):
+    days = days_since(c.get("published_at"))
+    recency_bonus = 0
+    if days is not None and days <= args.recent_days:
+        recency_bonus = 10_000_000  # push recent to top
+    return (recency_bonus + (c.get("like") or 0))
+
+
+def save_platform_pool(platform: str, items: list[dict]) -> int:
+    """Rank + persist one platform's pool. Called right after each platform
+    finishes (before any cooldown) so a killed/timed-out run never loses cards."""
+    seen: dict[str, dict] = {}
+    # merge with existing file when --append
+    if args.append:
+        prev_path = CAND_DIR / f"{platform}.json"
+        if prev_path.exists():
+            try:
+                for c in json.loads(prev_path.read_text()):
+                    if c.get("id"): seen[c["id"]] = c
+            except Exception: pass
+    for c in items:
+        if c["id"] not in seen or (c.get("like") or 0) > (seen[c["id"]].get("like") or 0):
+            seen[c["id"]] = c
+    uniq = sorted(seen.values(), key=rank_key, reverse=True)[:args.pool_size]
+    (CAND_DIR / f"{platform}.json").write_text(
+        json.dumps(uniq, ensure_ascii=False, indent=2), encoding="utf-8")
+    recent = sum(1 for c in uniq if (days_since(c.get("published_at")) or 999) <= args.recent_days)
+    print(f"=> {platform}: {len(uniq)} candidates saved  (recent≤{args.recent_days}d: {recent})", flush=True)
+    return len(uniq)
+
 pools: dict[str, list[dict]] = {p: [] for p in platforms}
 with sync_playwright() as p_ctx:
     b = p_ctx.chromium.connect_over_cdp("http://127.0.0.1:9222")
@@ -423,7 +486,8 @@ with sync_playwright() as p_ctx:
     # 拟人化: 平台顺序随机, 关键词顺序随机, 每期只跑部分组合
     platforms_shuffled = list(platforms)
     random.shuffle(platforms_shuffled)
-    for platform in platforms_shuffled:
+    for plat_i, platform in enumerate(platforms_shuffled):
+        is_last_platform = plat_i == len(platforms_shuffled) - 1
         fn = DISCOVERERS.get(platform)
         if not fn:
             print(f"[{platform}] no discoverer, skip"); continue
@@ -445,8 +509,11 @@ with sync_playwright() as p_ctx:
                     print(f"[{platform}] {kw!r} failed: {e.__class__.__name__}: {str(e)[:80]}", flush=True)
                     consecutive_fail += 1
                 if consecutive_fail >= 2:
-                    print(f"[{platform}] STOP: {consecutive_fail} 连续失败, 疑似被风控, 长冷却 5-10 分", flush=True)
-                    time.sleep(random.uniform(300, 600))
+                    print(f"[{platform}] STOP: {consecutive_fail} 连续失败, 疑似被风控", flush=True)
+                    # 只有后面还有平台要跑时才长冷却; 否则白等一场, 反而可能被上层 timeout 杀掉
+                    if not is_last_platform:
+                        print(f"[{platform}] 长冷却 5-10 分", flush=True)
+                        time.sleep(random.uniform(300, 600))
                     break
                 # 关键词之间: 短冷却 (拟人); xhs 更保守 (它反爬升级快)
                 if kw_i < len(kws_shuffled) - 1:
@@ -457,35 +524,15 @@ with sync_playwright() as p_ctx:
         finally:
             try: page.close()
             except Exception: pass
-        # 平台之间: 大冷却
-        cooldown(min_s=90, max_s=240)
+        # 先落盘再冷却: 上层 discover_loop 有 timeout, 冷却期间被杀不能丢结果
+        save_platform_pool(platform, pools[platform])
+        # 平台之间: 大冷却 (最后一个平台不用等)
+        if not is_last_platform:
+            cooldown(min_s=90, max_s=240)
 
 # ── rank + save candidates ──
-def rank_key(c):
-    days = days_since(c.get("published_at"))
-    recency_bonus = 0
-    if days is not None and days <= args.recent_days:
-        recency_bonus = 10_000_000  # push recent to top
-    return (recency_bonus + (c.get("like") or 0))
-
-for platform, items in pools.items():
-    seen: dict[str, dict] = {}
-    # merge with existing file when --append
-    if args.append:
-        prev_path = CAND_DIR / f"{platform}.json"
-        if prev_path.exists():
-            try:
-                for c in json.loads(prev_path.read_text()):
-                    if c.get("id"): seen[c["id"]] = c
-            except Exception: pass
-    for c in items:
-        if c["id"] not in seen or (c.get("like") or 0) > (seen[c["id"]].get("like") or 0):
-            seen[c["id"]] = c
-    uniq = sorted(seen.values(), key=rank_key, reverse=True)[:args.pool_size]
-    (CAND_DIR / f"{platform}.json").write_text(
-        json.dumps(uniq, ensure_ascii=False, indent=2), encoding="utf-8")
-    recent = sum(1 for c in uniq if (days_since(c.get("published_at")) or 999) <= args.recent_days)
-    print(f"=> {platform}: {len(uniq)} candidates saved  (recent≤{args.recent_days}d: {recent})", flush=True)
+for platform in platforms:
+    save_platform_pool(platform, pools[platform])
 
 # save summary
 summary = {"generated_at": dt.datetime.now().isoformat(),

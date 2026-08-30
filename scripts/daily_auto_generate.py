@@ -94,26 +94,52 @@ def next_target() -> tuple[str, str]:
 
 
 def all_downloaded() -> dict[str, Path]:
-    dl = {}
-    for wk in REPO.glob("assets/incoming/*/dl2"):
-        for f in wk.glob("*.mp4"):
-            m = re.match(r"([a-z]+)_([0-9a-f]+)\.mp4", f.name)
-            if m: dl[m.group(2)] = f
+    """把所有 dl2 目录里的成品按 video id 建索引。
+
+    历史上这里只认 `<platform>_<hex>.mp4`, 于是:
+      - 早期直接叫 `<id>.mp4` 的抖音素材 (17 支)
+      - `youtube_<含大写和横线的 id>.mp4`
+      - yt-dlp 留下的 `<plat>_<id>.info.mp4`
+    全被无视, 94 支已下载素材只认出 42 支, 白白触发"素材耗尽"。
+    """
+    dl: dict[str, Path] = {}
+    for f in REPO.glob("assets/incoming/*/dl2/*.mp4"):
+        stem = f.name[:-4]
+        # `<id>.info.mp4` 是 yt-dlp 落下的 JSON 边车, 不是视频。
+        # 归一化成同一个 key 会让它盖掉真视频 -> probe_dur()=0 -> 候选被当成太短丢掉。
+        if stem.endswith(".info"):
+            continue
+        m = re.match(r"(?:([a-z]+)_)?([A-Za-z0-9_-]+)$", stem)
+        if not m:
+            continue
+        dl.setdefault(m.group(2), f)
     return dl
 
 
-def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
+def extract_vid(url: str) -> str | None:
+    """从各平台链接里抠出视频 id。抖音/TikTok 走 /video/<id>, 小红书走
+    /explore|/search_result/<hex>, Instagram 走 /reel/<id>, YouTube 走 v= 或 /shorts/。"""
+    m = re.search(
+        r"/video/([\w-]+)"
+        r"|/(?:explore|search_result)/([0-9a-f]+)"
+        r"|/reel/([\w-]+)"
+        r"|/shorts/([\w-]+)"
+        r"|[?&]v=([\w-]+)"
+        r"|youtu\.be/([\w-]+)",
+        url or "")
+    if not m:
+        return None
+    return next((g for g in m.groups() if g), None)
+
+
+def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[Path, list[str]]:
     target = f"{week}-{edition}"
-    pool_p = source_pool()
+    pool_p = pool_path or source_pool()
     if not pool_p:
         raise SystemExit("no A pool found")
     a = json.load(open(pool_p))
     used = used_urls(target)
     dl = all_downloaded()
-
-    def extract_vid(url: str) -> str | None:
-        m = re.search(r"/video/(\d+)|/(?:explore|search_result)/([0-9a-f]+)", url or "")
-        return (m.group(1) or m.group(2)) if m else None
 
     # 收合规候选 (未用+已下载+8-180s)
     opts = []
@@ -139,8 +165,11 @@ def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
     if len(opts) < 6:
         warnings.append("无加映候选 (只出 TOP5)")
 
-    # 建 config
-    tpl_p = next((WEEKLY / n for n in [f"{week}-A.json", "2026-W30-A.json"] if (WEEKLY / n).exists()), pool_p)
+    # 建 config: 显式传了 pool 就以它为模板, 否则退回本周 A 池 / 老模板
+    if pool_path:
+        tpl_p = pool_p
+    else:
+        tpl_p = next((WEEKLY / n for n in [f"{week}-A.json", "2026-W30-A.json"] if (WEEKLY / n).exists()), pool_p)
     cfg = copy.deepcopy(json.load(open(tpl_p)))
     cfg["week"] = target
     # 关键 bug 防护: episode.week 也要同步, 不然 intro_vo 会读到模板的旧 week/edition
@@ -164,9 +193,13 @@ def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
 
     # narration
     def mkvo(rank, dt, song, creator, classic=False):
-        creator = (creator or "").lstrip("@"); sp = f" {song}" if song else ""
-        if classic: return f"特别加映，{dt}街舞{sp}，来自 {creator}。"
-        return f"第{rank}名，{dt}街舞{sp}，来自 {creator}。"
+        creator = (creator or "").lstrip("@").strip()
+        sp = f" {song}" if song else ""
+        # 作者名为空时不能留一个光秃秃的"来自" —— 评估器在 W31-B 上抓到过这个
+        src = f"，来自 {creator}" if creator else ""
+        if classic:
+            return f"特别加映，{dt}街舞{sp}{src}。"
+        return f"第{rank}名，{dt}街舞{sp}{src}。"
 
     narr = []
     for pp in cfg["picks"]:
@@ -184,6 +217,12 @@ def build_week(week: str, edition: str) -> tuple[Path, list[str]]:
     stage = REPO / f"assets/incoming/{target}"
     stage.mkdir(exist_ok=True)
     (stage / "dl2").mkdir(exist_ok=True)
+    # 先清掉上一轮留下的 staging 硬链接。候选 id (cN) 是每轮重新编号的, 而
+    # render_demo.find_clip() 只按 `cN__` 前缀取第一个匹配 —— 残留的
+    # c1__douyin__<旧id>.mp4 会按字母序压过新的 c1__tiktok__<新id>.mp4,
+    # 结果就是"顶部写着新作者, 画面放的是上一轮的舞"。
+    for old in stage.glob("*.mp4"):
+        old.unlink()
     for t in top + ([opts[5]] if len(opts) >= 6 else []):
         rec, dl_f, vid = t[2], t[3], t[4]
         cid = rec["id"]
