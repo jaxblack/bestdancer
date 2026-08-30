@@ -52,6 +52,21 @@ def platform_ready(platform: str) -> tuple[bool, str]:
     if not url:
         return False, "候选里没有可用链接"
 
+    # 试前几支而不是只试第一支: 单支可能因为年龄限制/会员专属/已删除而失败,
+    # 不能因此判定整个平台不可用 (实测 YouTube 就被第一支拖累误判过)。
+    urls = [it["url"] for it in items if it.get("url")][:3]
+    last_err = ""
+    for url in urls:
+        ok, err = _probe_one(platform, url)
+        if ok:
+            return True, ""
+        last_err = err
+        if "需要登录态" in err:
+            return False, err
+    return False, last_err or "试下载失败"
+
+
+def _probe_one(platform: str, url: str) -> tuple[bool, str]:
     probe_dir = DL2 / ".probe"
     if probe_dir.exists():
         shutil.rmtree(probe_dir, ignore_errors=True)

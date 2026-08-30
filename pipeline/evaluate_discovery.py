@@ -140,17 +140,41 @@ def vid_of(mp4: Path) -> str:
     return mp4.stem.split("_", 1)[-1]
 
 
+def pool_vids(cands: list[dict]) -> set[str]:
+    """当前候选池里的视频 id 集合。"""
+    out = set()
+    for c in cands:
+        m = re.search(r"/video/([\w-]+)|/(?:explore|search_result)/([0-9a-f]+)"
+                      r"|/reel/([\w-]+)|/shorts/([\w-]+)|[?&]v=([\w-]+)|youtu\.be/([\w-]+)",
+                      c.get("url") or "")
+        if m:
+            v = next((g for g in m.groups() if g), None)
+            if v:
+                out.add(v)
+        if c.get("id"):
+            out.add(str(c["id"]))
+    return out
+
+
 def score_platform(platform: str, cands: list[dict], clips: list[Path],
                    verdicts: dict[str, dict], recent_days: int,
                    deep_visual: bool) -> dict:
     n = len(cands)
     notes: list[str] = []
     dims: dict[str, float | None] = {}
+    # 只统计**当前候选池里**的素材。否则改完关键词后, 分数还被上一轮关键词下载的
+    # 老素材拖着走, 根本看不出这次调整的效果 (调参循环就失效了)。
+    in_pool = pool_vids(cands)
+    stale = [c for c in clips if vid_of(c) not in in_pool]
+    clips = [c for c in clips if vid_of(c) in in_pool]
 
     # ── yield 采集量 ──
     dims["yield"] = clamp(pct(n, TARGET_POOL))
     if n < TARGET_POOL:
         notes.append(f"候选只有 {n} 条 (目标 {TARGET_POOL}): 关键词太窄或被限流")
+    if stale:
+        notes.append(f"另有 {len(stale)} 支已下载素材不属于当前候选池 "
+                     f"(上一轮关键词留下的), 未计入匹配度/画面")
 
     # ── metadata 元数据完整度 ──
     date_cov = pct(sum(1 for c in cands if c.get("published_at")), n)
