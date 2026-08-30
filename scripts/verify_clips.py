@@ -81,10 +81,10 @@ PROMPT_TPL = """你在给一个面向中文跳舞初学者的每周热舞榜栏�
    看到肚皮舞/东方舞就选 Belly, 看到鬼步舞/曳步舞就选 鬼步舞, 以此类推。
 3. people_count: 画面里同时在跳的人数。
 4. watermark_visible: 画面里能不能看到**原平台的作者水印或 @句柄**
-   (抖音右下角/小红书/TikTok 的用户名浮层)。这关系到署名合规。
+   (抖音右下角/小红书/TikTok 的用户名浮层)。仅作记录用, 不影响是否入选 ——
+   本栏目靠成片画面常驻的 @作者 署名来满足署名要求。
 5. visible_handle: 如果画面上能读到 @句柄或用户名, 原样写出来; 读不到就填空字符串。
-6. scene: 一句话描述画面内容。
-7. confidence: 你对 is_dance 和 dance_type 判断的把握 0-100。
+6. scene: 一句话描述画面内容。7. confidence: 你对 is_dance 和 dance_type 判断的把握 0-100。
 8. reject_reason: 如果 is_dance=false, 用一句话说明这是什么内容。
 
 只输出符合给定 JSON schema 的结果。"""
