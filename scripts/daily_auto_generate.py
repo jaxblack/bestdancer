@@ -132,6 +132,20 @@ def extract_vid(url: str) -> str | None:
     return next((g for g in m.groups() if g), None)
 
 
+def load_verdicts() -> dict[str, dict]:
+    """读 scripts/verify_clips.py 落下的画面判定, 按平台视频 id 索引。
+
+    这是舞种的**单一真源**: 候选池每轮重建、候选 id 每轮重编号, 只有视频 id 稳定。
+    """
+    out: dict[str, dict] = {}
+    for f in REPO.glob("output/verify/*/verdicts.json"):
+        try:
+            out.update(json.loads(f.read_text()))
+        except Exception:
+            continue
+    return out
+
+
 def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[Path, list[str]]:
     target = f"{week}-{edition}"
     pool_p = pool_path or source_pool()
@@ -140,18 +154,42 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
     a = json.load(open(pool_p))
     used = used_urls(target)
     dl = all_downloaded()
+    verdicts = load_verdicts()
 
-    # 收合规候选 (未用+已下载+8-180s)
+    # 收合规候选 (未用+已下载+8-180s+画面确认是舞蹈)
     opts = []
+    skipped_not_dance = 0
     for x in a.get("this_week_candidates", []) + a.get("classics_pool", []):
         url = x.get("url", "") or ""
         if not url or url in used: continue
         vid = extract_vid(url)
+        # verify_clips.py 抽帧判定过的以它为准: 非舞蹈不进榜, 舞种按真实画面改写
+        v = verdicts.get(vid or "") or (x.get("vision") or {})
+        if v and v.get("is_dance") is False:
+            skipped_not_dance += 1
+            continue
+        if v.get("dance_type") and v["dance_type"] != "Unknown":
+            x = {**x, "dance_type": v["dance_type"], "vision": v}
         if not vid or vid not in dl: continue
+        # 作者/标题以平台自己给的元数据为准 —— 候选池里的是爬搜索卡片来的, 会串行
+        meta_f = dl[vid].with_suffix(".json")
+        if meta_f.exists():
+            try:
+                meta = json.loads(meta_f.read_text())
+            except Exception:
+                meta = {}
+            author = (meta.get("author") or "").strip()
+            if author:
+                x = {**x, "creator": "@" + author.lstrip("@")}
+            desc = (meta.get("desc") or meta.get("title") or "").strip()
+            if desc:
+                x = {**x, "title": re.sub(r"\s+", " ", desc.split("\n")[0])[:120]}
         dur = probe_dur(dl[vid])
         if dur > 180 or dur < 8: continue
         opts.append((x.get("like", 0), dur, x, dl[vid], vid))
     opts.sort(key=lambda t: -t[0])
+    if skipped_not_dance:
+        print(f"[daily] 画面核对淘汰非舞蹈候选 {skipped_not_dance} 支")
 
     if len(opts) < 5:
         raise SystemExit(
@@ -179,8 +217,12 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
     cfg["classics_pool"] = [copy.deepcopy(x) for x in a.get("classics_pool", []) if x.get("url","") not in used]
     cfg["deleted_ids"] = []
 
-    def mkpick(rec, rank, dt="Urban", stars=3):
+    def mkpick(rec, rank, dt=None, stars=3):
         pp = copy.deepcopy(rec)
+        # 舞种必须沿用候选自己的值 —— scripts/verify_clips.py 已经按**真实画面**
+        # 校正过它。以前这里硬编码 "Urban", 于是画面是 K-pop 群舞、成片却写
+        # "Urban 街舞", 评估器一抓一个准。
+        dt = dt or (rec.get("dance_type") or "").strip() or "Urban"
         pp["rank"] = rank; pp["dance_type"] = dt
         pp["difficulty"] = {"stars": stars, "fit": dt, "scores": {}}
         return pp
@@ -192,14 +234,26 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
         cfg["classic_comeback"] = {}
 
     # narration
+    # 舞种词 -> 口播里自然的说法。以前无脑拼 f"{dt}街舞", 于是念出
+    # "Choreography街舞" / "K-pop街舞" 这种别扭组合。
+    VO_DANCE = {
+        "Choreography": "编舞", "Urban": "Urban 编舞", "K-pop": "K-pop 编舞",
+        "Hip-hop": "Hip-hop", "Jazz": "爵士", "Popping": "Popping",
+        "Locking": "Locking", "Breaking": "Breaking", "Street": "街舞",
+        "House": "House", "Waacking": "Waacking", "Vogue": "Vogue",
+        "Dancehall": "Dancehall", "Belly": "东方舞", "Latin": "拉丁舞",
+        "Ballet": "芭蕾", "中国舞": "中国舞", "民族舞": "民族舞", "鬼步舞": "鬼步舞",
+    }
+
     def mkvo(rank, dt, song, creator, classic=False):
         creator = (creator or "").lstrip("@").strip()
         sp = f" {song}" if song else ""
+        name = VO_DANCE.get((dt or "").strip(), (dt or "").strip() or "街舞")
         # 作者名为空时不能留一个光秃秃的"来自" —— 评估器在 W31-B 上抓到过这个
         src = f"，来自 {creator}" if creator else ""
         if classic:
-            return f"特别加映，{dt}街舞{sp}{src}。"
-        return f"第{rank}名，{dt}街舞{sp}{src}。"
+            return f"特别加映，{name}{sp}{src}。"
+        return f"第{rank}名，{name}{sp}{src}。"
 
     narr = []
     for pp in cfg["picks"]:

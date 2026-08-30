@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -36,8 +37,12 @@ from codex_client import find_codex, run_codex_json  # noqa: E402
 WEEKLY = REPO / "config" / "weekly"
 INCOMING = REPO / "assets" / "incoming"
 
-# 允许出现在成片上的舞种词 —— 必须和 admin 下拉、render 的角标保持一致
-DANCE_TYPES = ["Hip-hop", "Urban", "Jazz", "K-pop", "Popping", "Locking", "Breaking", "Choreography"]
+# 允许出现在成片上的舞种词 —— 必须和 admin 下拉、render 的角标保持一致。
+# 覆盖面要够宽: 只给 Urban/Choreography 几个选项时, 模型会把肚皮舞/东方舞硬塞进
+# Choreography, 成片就写错舞种 (W31-C 实测被评估器抓到)。
+DANCE_TYPES = ["Hip-hop", "Urban", "Jazz", "K-pop", "Popping", "Locking", "Breaking",
+               "House", "Waacking", "Vogue", "Dancehall", "Belly", "Latin",
+               "Ballet", "中国舞", "民族舞", "鬼步舞", "Choreography"]
 
 CLIP_SCHEMA = {
     "type": "object",
@@ -71,7 +76,9 @@ PROMPT_TPL = """你在给一个面向中文跳舞初学者的每周热舞榜栏�
    资讯或新闻截图、纯文字卡、聊天录屏、带货或穿搭展示、纯走位vlog、
    舞蹈教学分解讲解(没有完整跳)、以及画面里根本没有人在跳的。
 2. dance_type: 画面里实际的舞种, 从 {types} 里选一个; 看不出来就填 Unknown。
-   注意别被标题带跑 —— 以身体动作为准。
+   注意别被标题带跑 —— 以身体动作和服装为准。
+   Choreography 只在"确实是成套编舞但归不进任何具体舞种"时才用, 别拿它当万能兜底;
+   看到肚皮舞/东方舞就选 Belly, 看到鬼步舞/曳步舞就选 鬼步舞, 以此类推。
 3. people_count: 画面里同时在跳的人数。
 4. watermark_visible: 画面里能不能看到**原平台的作者水印或 @句柄**
    (抖音右下角/小红书/TikTok 的用户名浮层)。这关系到署名合规。
@@ -113,7 +120,11 @@ def extract_frames(mp4: Path, out_dir: Path, n: int = 3) -> list[Path]:
 
 def cache_key(mp4: Path) -> str:
     st = mp4.stat()
-    return f"{mp4.name}:{st.st_size}:{int(st.st_mtime)}"
+    # 带上 prompt/schema 指纹: 改了判定口径就该重新判, 否则会拿旧口径的结论
+    fingerprint = hashlib.sha1(
+        (PROMPT_TPL + json.dumps(CLIP_SCHEMA, sort_keys=True)).encode()
+    ).hexdigest()[:8]
+    return f"{mp4.name}:{st.st_size}:{int(st.st_mtime)}:{fingerprint}"
 
 
 def verify_one(mp4: Path, meta: dict, work_dir: Path, codex_bin: str,
@@ -134,20 +145,30 @@ def verify_one(mp4: Path, meta: dict, work_dir: Path, codex_bin: str,
 
 
 def load_dl2_meta(week: str) -> dict[str, dict]:
-    """dl2/<平台>_<id>.json 是平台权威元数据, 按视频 id 索引。"""
+    """dl2/<平台>_<id>.json 是平台权威元数据, 按视频 id 索引。
+
+    有些 mp4 是早先中断的那轮下下来的, 只有视频没有 json 边车 (下载器发现文件已存在
+    就直接 skip 了)。这些也必须纳入核对, 否则它们会绕过画面判定进成片。
+    """
+    base = INCOMING / week / "dl2"
     out: dict[str, dict] = {}
-    for f in (INCOMING / week / "dl2").glob("*.json"):
-        if f.name.endswith(".info.json"):
+    for mp4 in base.glob("*.mp4"):
+        if mp4.name.endswith(".info.mp4"):
             continue
-        try:
-            d = json.loads(f.read_text())
-        except json.JSONDecodeError:
-            continue
-        vid = str(d.get("id") or f.stem.split("_", 1)[-1])
-        mp4 = f.with_suffix(".mp4")
-        if mp4.exists():
-            d["_mp4"] = str(mp4)
-            out[vid] = d
+        stem = mp4.stem
+        meta: dict = {}
+        side = mp4.with_suffix(".json")
+        if side.exists():
+            try:
+                meta = json.loads(side.read_text())
+            except json.JSONDecodeError:
+                meta = {}
+        if not meta:
+            plat, _, rest = stem.partition("_")
+            meta = {"id": rest or stem, "platform": plat, "author": "", "desc": ""}
+        vid = str(meta.get("id") or stem.split("_", 1)[-1])
+        meta["_mp4"] = str(mp4)
+        out[vid] = meta
     return out
 
 
@@ -282,19 +303,32 @@ def main() -> int:
         print(f"[verify] ⚠️ 署名存疑 (疑似搬运): {mismatched}")
 
     if args.apply:
+        rejected_urls = sorted({c.get("url") for c in cfg.get("this_week_candidates", [])
+                                if c["id"] in set(rejected) and c.get("url")})
         cfg["this_week_candidates"] = [c for c in cfg.get("this_week_candidates", [])
                                        if c["id"] not in rejected]
         cfg["deleted_ids"] = sorted(set(cfg.get("deleted_ids", [])) | set(rejected))
+        # 候选 id (cN) 每轮会重编号, 所以淘汰名单必须按 URL 记, 才能在
+        # auto_episode 重建候选池时继续生效
+        cfg["_rejected_urls"] = sorted(set(cfg.get("_rejected_urls", [])) | set(rejected_urls))
         cfg["picks"] = [p for p in cfg.get("picks", []) if p.get("id") not in rejected]
         cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"[verify] 已写回 {cfg_path.relative_to(REPO)} "
-              f"(剩余候选 {len(cfg['this_week_candidates'])})")
+              f"(剩余候选 {len(cfg['this_week_candidates'])}, "
+              f"累计淘汰 URL {len(cfg['_rejected_urls'])})")
 
     report = {"week": week, "verified": len(verdicts), "rejected": rejected,
               "retyped": retyped, "mismatched": mismatched,
               "meta_fixed": fixed_meta}
     (work_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                           encoding="utf-8")
+    # 按**平台视频 id** 落一份判定, 这是给 daily_auto_generate.build_week 用的单一真源。
+    # 候选池每轮都会重建、候选 id (cN) 每轮重编号, 判定结果挂在配置里迟早会丢;
+    # 挂在视频 id 上就永远对得上。
+    (work_dir / "verdicts.json").write_text(
+        json.dumps(verdicts, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[verify] 判定已存 {(work_dir / 'verdicts.json').relative_to(REPO)} "
+          f"({len(verdicts)} 支, 按视频 id 索引)")
     return 0
 
 

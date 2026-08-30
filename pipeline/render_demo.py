@@ -106,6 +106,23 @@ _EMOJI_RE = re.compile(
     "]+")
 
 
+_BRACKET_PAIRS = [("（", "）"), ("(", ")"), ("【", "】"), ("[", "]"), ("《", "》")]
+
+
+def _drop_unbalanced_brackets(s: str) -> str:
+    """昵称/标题被上游按字数截断后, 常留下没有闭合的半个括号
+    (实测 "Homies 唐TT（版本很不乐意效劳")。画面上很扎眼, 直接把没闭合的那段裁掉。"""
+    for left, right in _BRACKET_PAIRS:
+        while s.count(left) > s.count(right):
+            idx = s.rfind(left)
+            if idx < 0:
+                break
+            s = s[:idx]
+        while s.count(right) > s.count(left):
+            s = s.replace(right, "", 1)
+    return s.strip(" ·-—_")
+
+
 def clean(s: str) -> str:
     if not s:
         return ""
@@ -114,6 +131,7 @@ def clean(s: str) -> str:
     # 抖音标题/昵称里全是 emoji 和私用区图标, 正文字体没有这些字形 -> 画面上是方框。
     # 评估器在 2026-W31-B 上抓到过"顶部标题出现多个方框缺字"。
     s = _EMOJI_RE.sub("", s)
+    s = _drop_unbalanced_brackets(s)
     return re.sub(r"\s{2,}", " ", s).strip()
 
 
@@ -135,16 +153,40 @@ def first_sentences(text: str, n: int = 3) -> str:
     return "".join(parts[:n])
 
 
+_WRAP_TOKEN_RE = re.compile(r"[A-Za-z0-9_.\-']+|\s+|[^A-Za-z0-9_.\-'\s]")
+
+
 def wrap(draw, text, font, max_w):
+    """按宽度折行, 但**不把拉丁词/账号名从中间劈开**。
+
+    以前是逐字符折行, 于是 "suana281" 变成 "suan / a281"、"Homies" 变成
+    "Homi / es" —— 评估器每期都报署名被拆坏。中文按字断没问题, 英文数字必须整词断。
+    """
     lines, cur = [], ""
-    for ch in text:
-        if draw.textlength(cur + ch, font=font) <= max_w:
-            cur += ch
+    for token in _WRAP_TOKEN_RE.findall(text):
+        if token.isspace():
+            # 行首的空格丢掉, 其余空格只有放得下才保留
+            if cur and draw.textlength(cur + token, font=font) <= max_w:
+                cur += token
+            continue
+        if draw.textlength(cur + token, font=font) <= max_w:
+            cur += token
+            continue
+        if cur:
+            lines.append(cur.rstrip())
+            cur = ""
+        # 单个词本身就超宽 (超长账号名), 只能退化成逐字符切
+        if draw.textlength(token, font=font) > max_w:
+            for ch in token:
+                if draw.textlength(cur + ch, font=font) <= max_w:
+                    cur += ch
+                else:
+                    lines.append(cur)
+                    cur = ch
         else:
-            lines.append(cur)
-            cur = ch
-    if cur:
-        lines.append(cur)
+            cur = token
+    if cur.strip():
+        lines.append(cur.rstrip())
     return lines
 
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -27,6 +28,61 @@ DL2.mkdir(parents=True, exist_ok=True)
 COOKIES = BASE / "cookies.txt"
 
 PLATFORMS = [p for p in args.platforms.split("|") if p]
+
+BOT_CHECK_MARKERS = ("sign in to confirm", "not a bot", "login required",
+                     "private video", "members-only")
+
+
+def platform_ready(platform: str) -> tuple[bool, str]:
+    """开跑前先真下一支, 确认这个平台当前能不能用。
+
+    只查元数据是不够的 —— YouTube 在没有有效登录态时**元数据能取到,
+    但媒体流会被限速到 0 字节**, 每支都要卡满 socket 超时才失败, 12 支就是半小时
+    白等。这里硬性 75 秒封顶并检查落盘字节数: 正常平台几秒就下完一支短视频,
+    被限速的平台 75 秒后仍是 0 字节, 直接整个平台跳过。
+    """
+    cand_file = CANDS / f"{platform}.json"
+    if not cand_file.exists():
+        return False, "没有候选文件"
+    try:
+        items = json.loads(cand_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False, "候选文件解析失败"
+    url = next((it.get("url") for it in items if it.get("url")), None)
+    if not url:
+        return False, "候选里没有可用链接"
+
+    probe_dir = DL2 / ".probe"
+    if probe_dir.exists():
+        shutil.rmtree(probe_dir, ignore_errors=True)
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    cmd = ["yt-dlp", "--no-warnings", "--no-playlist", "--no-part",
+           "--socket-timeout", "12", "--retries", "1", "--fragment-retries", "1",
+           "-f", "mp4/bestvideo+bestaudio/best",
+           "-o", str(probe_dir / "probe.%(ext)s"), url]
+    cookie = BASE / f"cookies_{platform}.txt"
+    if platform == "douyin" and COOKIES.exists():
+        cmd += ["--cookies", str(COOKIES)]
+    elif cookie.exists():
+        cmd += ["--cookies", str(cookie)]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=75)
+        err = ((r.stderr or "") + (r.stdout or "")).lower()
+    except subprocess.TimeoutExpired:
+        r, err = None, "timeout"
+    got = max((f.stat().st_size for f in probe_dir.glob("probe.*")), default=0)
+    shutil.rmtree(probe_dir, ignore_errors=True)
+
+    if got > 50_000:
+        return True, ""
+    if any(m in err for m in BOT_CHECK_MARKERS):
+        return False, (f"需要登录态: 请在调试 Chrome "
+                       f"(--user-data-dir=~/.chrome-debug-profile) 里登录 {platform} 后重试")
+    if err == "timeout":
+        return False, "试下载 75 秒没拿到数据 (多半是登录态失效被限速)"
+    tail = (r.stderr or "").strip().splitlines()[-1][:160] if r and r.stderr else "未知原因"
+    return False, f"试下载失败: {tail}"
+
 
 DANCE_KEYWORDS = ["urban", "hiphop", "hip-hop", "kpop", "k-pop", "jazz", "choreo", "编舞",
                   "dance", "舞蹈", "翻跳", "cover"]
@@ -168,5 +224,9 @@ def process_platform(platform: str) -> int:
 if __name__ == "__main__":
     total = 0
     for platform in PLATFORMS:
+        ok, why = platform_ready(platform)
+        if not ok:
+            print(f"[{platform}] 跳过 —— {why}", flush=True)
+            continue
         total += process_platform(platform)
     print(f"\n=== cross-platform DONE: {total} videos downloaded ===")

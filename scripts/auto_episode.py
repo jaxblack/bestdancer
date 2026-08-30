@@ -200,8 +200,35 @@ def build_pool_config(target: str, max_candidates: int, provisional_picks: int) 
     cfg["week"] = target
     if isinstance(cfg.get("episode"), dict):
         cfg["episode"]["week"] = target
-    cfg["deleted_ids"] = []
     cfg["classics_pool"] = []
+
+    # 保住上一轮 verify_clips.py 的成果: 画面判定和淘汰名单都是花了 token 算出来的,
+    # 重跑 auto_episode 不该把它们冲掉 (否则被判为"非舞蹈"的素材又会溜回榜单)。
+    prev_path = WEEKLY / f"{target}.json"
+    prev_vision: dict[str, dict] = {}
+    prev_deleted: set[str] = set()
+    prev_rejected_urls: set[str] = set()
+    if prev_path.exists():
+        try:
+            prev = json.loads(prev_path.read_text())
+        except json.JSONDecodeError:
+            prev = {}
+        prev_deleted = set(prev.get("deleted_ids", []))
+        for c in prev.get("this_week_candidates", []):
+            if c.get("url") and c.get("vision"):
+                prev_vision[c["url"]] = c
+        # 已经被 verify 剔出候选池的, 靠 URL 记住 —— 候选 id 每轮重编号, 记 id 没用
+        prev_rejected_urls = set(prev.get("_rejected_urls", []) or [])
+
+    kept: list[dict] = []
+    for c in fresh:
+        url = c.get("url")
+        if url in prev_rejected_urls:
+            continue
+        kept.append(c)
+    fresh = kept
+
+    cfg["deleted_ids"] = sorted(prev_deleted)
     cfg["this_week_candidates"] = [{
         "id": f"c{i}",
         "platform": c.get("platform", ""),
@@ -221,6 +248,24 @@ def build_pool_config(target: str, max_candidates: int, provisional_picks: int) 
         "candidate_tier": "top" if i <= provisional_picks else "backup",
     } for i, c in enumerate(fresh, 1)]
 
+    # 把上一轮的画面判定结果贴回去 (舞种以画面为准, 别再退回按标题猜)
+    carried = 0
+    for cand in cfg["this_week_candidates"]:
+        old = prev_vision.get(cand.get("url"))
+        if not old:
+            continue
+        cand["vision"] = old["vision"]
+        if old.get("dance_type"):
+            cand["dance_type"] = old["dance_type"]
+        for key in ("creator", "title", "source_desc", "duration_sec", "local_path",
+                    "download_status"):
+            if old.get(key):
+                cand[key] = old[key]
+        carried += 1
+    if carried:
+        print(f"[auto] 沿用上一轮画面核对结果 {carried} 支", flush=True)
+
+    cfg["_rejected_urls"] = sorted(prev_rejected_urls)
     cfg["picks"] = [dict(c, rank=i) for i, c in
                     enumerate(cfg["this_week_candidates"][:provisional_picks], 1)]
     cfg["classic_comeback"] = {}
@@ -263,6 +308,17 @@ def step_download(target: str) -> int:
     finally:
         if watchdog:
             watchdog.terminate()
+
+
+def step_verify(target: str, no_llm: bool, model: str | None) -> int:
+    """下载完成后核对"画面 vs 名字": 权威元数据回填 + 抽帧判定舞种/是否真在跳舞。
+    非舞蹈素材直接从候选池剔除, 免得进了成片才被评估器打回。"""
+    cmd = [PY, "-u", "scripts/verify_clips.py", target, "--apply"]
+    if no_llm:
+        cmd.append("--no-vision")
+    if model:
+        cmd += ["--model", model]
+    return sh(cmd)
 
 
 def step_build(week: str, edition: str, pool_path: Path) -> tuple[Path, list[str]]:
@@ -338,6 +394,8 @@ def main() -> int:
     ap.add_argument("--edition", default=None, help="如 C")
     ap.add_argument("--skip-discover", action="store_true")
     ap.add_argument("--skip-download", action="store_true")
+    ap.add_argument("--skip-verify", action="store_true",
+                    help="跳过素材画面核对 (舞种/作者是否对得上)")
     ap.add_argument("--skip-render", action="store_true")
     ap.add_argument("--threshold", type=int, default=80, help="评估及格线")
     ap.add_argument("--max-attempts", type=int, default=2, help="不及格时最多重做几轮")
@@ -374,6 +432,9 @@ def main() -> int:
         if not ensure_cdp():
             return 2
         step_download(target)
+
+    if not args.skip_verify:
+        step_verify(target, args.no_llm, args.model)
 
     attempt = 0
     passed = False
