@@ -49,6 +49,35 @@ python3 pipeline/evaluate_demo.py 2026-W31-C --no-llm   # 只跑硬指标
 一律按不及格处理，绝不放行。`codex` 不在 PATH 时会自动去 VS Code 扩展目录找，
 也可以用 `BESTDANCER_CODEX_BIN` 指定。
 
+### 采集效果评分（调关键词/筛选条件用）
+
+```bash
+python3 pipeline/evaluate_discovery.py 2026-W31-C            # 打分
+python3 pipeline/evaluate_discovery.py 2026-W31-C --compare  # 和历史对比
+```
+
+各平台搜索页结构不同，关键词和筛选条件要反复调。这个脚本把采集质量拆成七个可量化
+维度加权成综合分：`yield` 采集量、`metadata` 元数据完整度、`recency` 时效、`heat` 热度、
+`download` 可下载性、`relevance` 街舞匹配度、`visual` 画面（含黑边检测）。
+`metadata` 和 `relevance` 权重最高——前者决定筛选能不能做，后者决定选出来能不能用。
+
+结果写 `output/discovery_eval/<week>/report.json`，并追加 `history.jsonl`，
+`--compare` 直接看每次调参后的分数变化。**匹配度只统计命中当前候选池的素材**，
+否则改完关键词后分数还被上一轮的老素材拖着走，调参循环就失效了。
+
+关键词按平台分开配在 `admin/settings.json:platform_keywords`（没配则退回全局
+`keywords`）。抖音搜泛词「舞」会捞回大量手势舞和资讯号，TikTok/YouTube 搜中文几乎
+没结果——这就是要分开配的原因。
+
+### 各平台当前状态
+
+| 平台 | 发现 | 下载 | 备注 |
+|---|---|---|---|
+| 抖音 | ✅ | ✅ | 元数据最全；关键词必须用「编舞/翻跳」向，泛词匹配度只有 33 |
+| TikTok | ✅ | ✅ | 走 `/api/search/item/full/` 拦截拿真实 `createTime`；搜索按相关度排序，时效偏旧 |
+| Instagram | ✅ | ⚠️ | 走 `/graphql/query` 拦截 + 详情页补元数据；下载器尚未接 |
+| YouTube | ✅ | ❌ | 发现很好（本周内占比 100%）；**下载被 SABR/PO token 挡住，当前只作发现源** |
+
 ## 每期流程
 
 1. **候选发现 & 上传**（[06](prompts/06-trend-brief.md)）：抖音 / 小红书反爬时不自动抓取——把热门候选链接 / 热榜丢给助理整理成清单，按 `<id>__<source>__<slug>.mp4` 命名下载到 `assets/incoming/<week>/`，跑 `python pipeline/intake.py <week>` 入库。经典回归从自有旧舞库（`classics_pool`）选。

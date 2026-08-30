@@ -270,38 +270,94 @@ def discover_xhs(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_tiktok(page, kw: str, per_kw: int) -> list[dict]:
-    search_and_wait(page, "tiktok", "https://www.tiktok.com",
-                    "https://www.tiktok.com/search?q={kw}", kw,
-                    'a[href*="/video/"]',
-                    'input[type="search"], input[placeholder*="Search"]')
-    for _ in range(random.randint(2, 4)):
-        human_scroll(page, total=random.randint(1600, 2400))
-        idle(0.8, 2.0)
-    wiggle_cursor(page)
-    cards = page.locator('a[href*="/video/"]').evaluate_all("""anchors => anchors.map(a => {
-        const card = a.closest('div[class*=DivItemContainer], article') || a.parentElement;
-        return { href: a.href, text: (card?.innerText||'').slice(0,400) };
-    }).filter((v,i,arr) => arr.findIndex(x=>x.href===v.href)===i)""")
-    out = []
-    for c in cards[:per_kw*2]:
-        vid_m = re.search(r"/video/(\d+)", c["href"])
-        if not vid_m: continue
-        creator_m = re.search(r"tiktok\.com/@([^/]+)/", c["href"])
-        creator = creator_m.group(1) if creator_m else "unknown"
-        lines = [x.strip() for x in c["text"].splitlines() if x.strip()]
-        content = [l for l in lines if l not in NAV][:6]
-        if EXCLUDE.search(" ".join(content)): continue
-        title = content[0] if content else ""
-        published = None; like = 0
-        for ln in content:
-            d = parse_date(ln)
-            if d and not published: published = d
-            n = parse_compact_number(ln)
-            if n > like: like = n
-        out.append({"id": vid_m.group(1), "platform": "tiktok",
-                    "url": c["href"], "title": title[:200], "author": creator,
-                    "like": like, "published_at": published,
-                    "source_desc": c["text"][:400], "keyword": kw})
+    """TikTok 走**接口拦截**: /api/search/item/full/ 里有 createTime / stats.diggCount /
+    author.uniqueId / desc, 比爬卡片文本准得多。
+
+    爬 DOM 的老做法在中文界面下卡片里根本没有日期文本, 发布时间只能靠猜 ——
+    采集评分里 tiktok 时效只有 24 分 (中位 44 天), 拿不到准确日期就没法按时效排序。
+    """
+    blobs: list[str] = []
+
+    def on_response(r):
+        try:
+            if "/api/search/item/full" in r.url or "/api/search/general/full" in r.url:
+                blobs.append(r.text())
+        except Exception:
+            pass
+
+    page.on("response", on_response)
+    try:
+        search_and_wait(page, "tiktok", "https://www.tiktok.com",
+                        "https://www.tiktok.com/search/video?q={kw}", kw,
+                        'a[href*="/video/"]',
+                        'input[type="search"], input[placeholder*="Search"]')
+        for _ in range(random.randint(3, 5)):
+            human_scroll(page, total=random.randint(1600, 2400))
+            idle(1.2, 2.4)
+        wiggle_cursor(page)
+    finally:
+        try:
+            page.remove_listener("response", on_response)
+        except Exception:
+            pass
+
+    seen: dict[str, dict] = {}
+    for raw in blobs:
+        try:
+            data = json.loads(raw)
+        except Exception:
+            continue
+        for entry in (data.get("item_list") or data.get("data") or []):
+            if not isinstance(entry, dict):
+                continue
+            it = entry.get("item") if "item" in entry else entry
+            if not isinstance(it, dict) or not it.get("id"):
+                continue
+            vid = str(it["id"])
+            if vid in seen:
+                continue
+            desc = it.get("desc") or ""
+            if EXCLUDE.search(desc):
+                continue
+            author = ((it.get("author") or {}).get("uniqueId") or "unknown")
+            ct = it.get("createTime")
+            published = None
+            if isinstance(ct, (int, float, str)) and str(ct).isdigit() and int(ct) > 0:
+                published = dt.date.fromtimestamp(int(ct)).isoformat()
+            stats = it.get("stats") or {}
+            seen[vid] = {
+                "id": vid, "platform": "tiktok",
+                "url": f"https://www.tiktok.com/@{author}/video/{vid}",
+                "title": re.sub(r"\s+", " ", desc)[:200], "author": author[:80],
+                "like": int(stats.get("diggCount") or 0),
+                "published_at": published,
+                "source_desc": desc[:400], "keyword": kw,
+            }
+    out = list(seen.values())
+    # 接口一次能给 70 条, 但 per_kw 只留 25 —— 按插入顺序砍会把少数几条新片砍掉。
+    # 先按「近 recent_days 内优先, 再按点赞」排序再截断, 时效才保得住。
+    out.sort(key=lambda c: (
+        1 if (c.get("published_at") and (days_since(c["published_at"]) or 999) <= args.recent_days) else 0,
+        c.get("like") or 0), reverse=True)
+    if not out:
+        # 接口没截到 (改版/被缓存) 就退回爬卡片, 至少还能拿到链接
+        cards = page.locator('a[href*="/video/"]').evaluate_all(
+            """anchors => anchors.map(a => a.href)
+                 .filter((v,i,arr) => arr.indexOf(v)===i)""")
+        for href in cards[:per_kw]:
+            vid_m = re.search(r"/video/(\d+)", href)
+            if not vid_m:
+                continue
+            creator_m = re.search(r"tiktok\.com/@([^/]+)/", href)
+            out.append({"id": vid_m.group(1), "platform": "tiktok", "url": href,
+                        "title": "", "author": creator_m.group(1) if creator_m else "unknown",
+                        "like": 0, "published_at": None, "source_desc": "", "keyword": kw})
+        print(f"[tiktok] {kw!r} 接口未截到, 回退爬卡片 -> {len(out)} 条(无元数据)", flush=True)
+    else:
+        recent = sum(1 for c in out
+                     if c["published_at"] and days_since(c["published_at"]) <= args.recent_days)
+        print(f"[tiktok] {kw!r} 接口拿到 {len(out)} 条 (近 {args.recent_days} 天 {recent} 条)",
+              flush=True)
     return out[:per_kw]
 
 def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
@@ -357,32 +413,204 @@ def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
                     "source_desc": text[:400], "keyword": kw})
     return out[:per_kw]
 
+INSTAGRAM_ENRICH_BUDGET = 14   # 每个关键词最多开这么多详情页补元数据
+
+
+def instagram_post_meta(page, url: str) -> dict | None:
+    """开一次 Instagram 详情页, 从 og:description 和 <time> 读作者/点赞/日期/文案。
+
+    og:description 形如 "1,234 likes, 56 comments - handle on July 12, 2026: "..."";
+    og:title 形如 "Han Jia Yi on Instagram: ..."。
+    """
+    try:
+        page.goto(url, timeout=30_000, wait_until="domcontentloaded")
+    except Exception:
+        return None
+    jitter_sleep(1.6, 3.2)
+    try:
+        info = page.evaluate("""() => ({
+            desc: document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '',
+            ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '',
+            dt: document.querySelector('time')?.getAttribute('datetime') || '',
+        })""")
+    except Exception:
+        return None
+    desc = info.get("desc") or ""
+    og = info.get("ogTitle") or ""
+    # 作者名要同时吃下英文和中文界面两种格式:
+    #   en: "1,234 likes, 56 comments - handle on July 12, 2026: "..."
+    #   zh: "4,828 likes, 96 comments -  theeyeflash999，August 26, 2026 : "..."
+    author = "unknown"
+    m = re.search(r"comments?\s*[-–—]\s*([A-Za-z0-9._]+)\s*(?:[，,]|\s+on\s)", desc)
+    if m:
+        author = m.group(1)
+    else:
+        m = re.match(r"^(.+?)\s+on Instagram", og)
+        if m:
+            author = m.group(1).strip()
+        else:
+            # zh: "Instagram 用户 THE EYE FLASH千胜帝 : "..."" —— 这是昵称不是句柄, 但聊胜于无
+            m = re.match(r"^Instagram\s*用户\s*(.+?)\s*[:：]", og)
+            if m:
+                author = m.group(1).strip()
+    like = 0
+    m2 = re.search(r"([\d,]+)\s+likes?", desc)
+    if m2:
+        like = int(m2.group(1).replace(",", ""))
+    published = (info.get("dt") or "")[:10] or None
+    if not published:
+        # desc 里带绝对日期 "August 26, 2026", 比 <time> 更常在
+        m3 = re.search(r"([A-Z][a-z]+ \d{1,2}, \d{4})", desc)
+        if m3:
+            try:
+                published = dt.datetime.strptime(m3.group(1), "%B %d, %Y").date().isoformat()
+            except ValueError:
+                pass
+    title = re.sub(r'^.*?[:：]\s*"?', "", desc).split('"')[0][:200] if desc else ""
+    if author == "unknown" and not like and not published:
+        return None
+    return {"author": author, "like": like, "published_at": published,
+            "title": re.sub(r"\s+", " ", title).strip()}
+
+
+def _walk_media(obj) -> list[dict]:
+    """从任意嵌套 JSON 里捞出「看起来像一条帖子」的对象。
+
+    Instagram 的 graphql 返回层级深且经常改名 (xdt_api__v1__... 之类), 按固定路径取
+    很容易一改版就全空。按特征找 (有 code/pk, 且带 like_count/taken_at/user) 稳得多。
+    """
+    found: list[dict] = []
+    if isinstance(obj, dict):
+        if ("code" in obj or "pk" in obj) and any(
+                k in obj for k in ("like_count", "taken_at", "user")):
+            found.append(obj)
+        for v in obj.values():
+            found += _walk_media(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            found += _walk_media(v)
+    return found
+
+
 def discover_instagram(page, kw: str, per_kw: int) -> list[dict]:
-    search_and_wait(page, "instagram", "https://www.instagram.com",
-                    "https://www.instagram.com/explore/search/keyword/?q={kw}", kw,
-                    'a[href*="/reel/"], a[href*="/p/"]',
-                    'input[placeholder*="Search"], input[aria-label*="Search"]')
-    for _ in range(random.randint(2, 4)):
-        human_scroll(page, total=random.randint(1400, 2400))
-        idle(0.8, 2.0)
-    wiggle_cursor(page)
-    cards = page.locator('a[href*="/reel/"], a[href*="/p/"]').evaluate_all("""anchors =>
-        anchors.map(a => {
-            const img = a.querySelector('img');
-            const alt = img?.getAttribute('alt') || '';
-            return { href: a.href, alt };
-        }).filter((v,i,arr) => arr.findIndex(x=>x.href===v.href)===i)
-    """)
-    out = []
-    for c in cards[:per_kw*2]:
-        vid_m = re.search(r"/(reel|p)/([\w-]+)", c["href"])
-        if not vid_m: continue
-        if EXCLUDE.search(c["alt"]): continue
-        out.append({"id": vid_m.group(2), "platform": "instagram",
-                    "url": c["href"].split("?")[0],
-                    "title": c["alt"][:200], "author": "unknown",
-                    "like": 0, "published_at": None,
-                    "source_desc": c["alt"][:400], "keyword": kw})
+    """Instagram 走**响应拦截**而不是爬 DOM。
+
+    实测搜索结果网格里 <a> 既没有 alt 也没有任何文字, 作者/点赞/日期一个都拿不到
+    (采集评分里 instagram 三项覆盖率全是 0%, 时间筛选和热度排序完全是摆设)。
+    但页面渲染用的 graphql/query 响应里 code/like_count/taken_at/user.username/
+    caption 一应俱全, 直接截这个。
+    """
+    blobs: list[str] = []
+
+    def on_response(r):
+        try:
+            if "/graphql" in r.url or "/api/v1/" in r.url:
+                if "json" in (r.headers.get("content-type") or ""):
+                    blobs.append(r.text())
+        except Exception:
+            pass
+
+    page.on("response", on_response)
+    try:
+        search_and_wait(page, "instagram", "https://www.instagram.com",
+                        "https://www.instagram.com/explore/search/keyword/?q={kw}", kw,
+                        'a[href*="/reel/"], a[href*="/p/"]',
+                        'input[placeholder*="Search"], input[aria-label*="Search"]')
+        # 每次滚动触发一页 graphql, 多滚几次才有量
+        for _ in range(random.randint(6, 9)):
+            human_scroll(page, total=random.randint(1600, 2600))
+            idle(1.4, 2.6)
+        wiggle_cursor(page)
+        # 首屏结果是服务端直出、塞在 <script> 里的, 不走 graphql —— 只截响应会漏掉一大半
+        try:
+            blobs += page.evaluate(
+                """() => [...document.querySelectorAll('script')]
+                       .map(s => s.textContent || '')
+                       .filter(t => t.length > 200 && (t.includes('"like_count"') || t.includes('"taken_at"')))""")
+        except Exception:
+            pass
+    finally:
+        try:
+            page.remove_listener("response", on_response)
+        except Exception:
+            pass
+
+    seen: dict[str, dict] = {}
+    for raw in blobs:
+        data = None
+        try:
+            data = json.loads(raw)
+        except Exception:
+            # <script> 里常是 requireLazy(...)({...}) 这类包裹, 把里面的 JSON 抠出来
+            for m in re.finditer(r'(\{"[\s\S]{200,}?\})\s*[;,)\]]', raw):
+                try:
+                    data = json.loads(m.group(1))
+                    break
+                except Exception:
+                    continue
+        if data is None:
+            continue
+        for m in _walk_media(data):
+            code = m.get("code")
+            if not code or code in seen:
+                continue
+            # media_type: 1=图片 2=视频。栏目只要视频
+            vt = m.get("media_type")
+            if vt not in (2, None) and not m.get("video_versions"):
+                continue
+            caption = m.get("caption")
+            text = (caption or {}).get("text", "") if isinstance(caption, dict) else ""
+            if EXCLUDE.search(text):
+                continue
+            taken = m.get("taken_at")
+            published = None
+            if isinstance(taken, (int, float)) and taken > 0:
+                published = dt.date.fromtimestamp(taken).isoformat()
+            user = m.get("user") or {}
+            seen[code] = {
+                "id": code, "platform": "instagram",
+                "url": f"https://www.instagram.com/reel/{code}/",
+                "title": re.sub(r"\s+", " ", text)[:200],
+                "author": (user.get("username") or "unknown")[:80],
+                "like": int(m.get("like_count") or 0),
+                "published_at": published,
+                "source_desc": text[:400], "keyword": kw,
+            }
+    out = list(seen.values())
+
+    # DOM 网格里的 <a> 数量远多于 graphql 能覆盖的 (实测 48 vs 3), 但网格本身
+    # 一个字段都读不到。所以: 缺元数据的那批, 逐个开详情页读 og:description +
+    # <time datetime> 补齐 (这套解析在 scripts/instagram_enrich_meta.py 里验证过)。
+    # 有预算上限, 避免为了几条元数据把账号跑进风控。
+    try:
+        anchors = page.locator('a[href*="/reel/"], a[href*="/p/"]').evaluate_all(
+            "as_ => [...new Set(as_.map(a => a.href.split('?')[0]))]")
+    except Exception:
+        anchors = []
+    budget = max(0, min(INSTAGRAM_ENRICH_BUDGET, per_kw - len(out)))
+    todo = [u for u in anchors
+            if (re.search(r"/(?:reel|p)/([\w-]+)", u) or [None])
+            and re.search(r"/(?:reel|p)/([\w-]+)", u).group(1) not in seen][:budget]
+    if todo:
+        print(f"[instagram] {kw!r} 网格另有 {len(anchors)} 条, 逐个补元数据 {len(todo)} 条",
+              flush=True)
+    for u in todo:
+        code = re.search(r"/(?:reel|p)/([\w-]+)", u).group(1)
+        meta = instagram_post_meta(page, u)
+        if not meta:
+            continue
+        if EXCLUDE.search(meta.get("title", "")):
+            continue
+        out.append({"id": code, "platform": "instagram",
+                    "url": f"https://www.instagram.com/reel/{code}/",
+                    "title": meta.get("title", "")[:200],
+                    "author": meta.get("author", "unknown")[:80],
+                    "like": meta.get("like", 0),
+                    "published_at": meta.get("published_at"),
+                    "source_desc": meta.get("title", "")[:400], "keyword": kw})
+        jitter_sleep(1.5, 4.0)
+
+    print(f"[instagram] {kw!r} 拦截 {len(blobs)} 个 JSON 响应 -> {len(out)} 条带元数据", flush=True)
     return out[:per_kw]
 
 def discover_bilibili(page, kw: str, per_kw: int) -> list[dict]:

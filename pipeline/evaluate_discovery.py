@@ -214,9 +214,16 @@ def score_platform(platform: str, cands: list[dict], clips: list[Path],
     # 分母用"被真正尝试过的那批" (候选池前 max_per_platform 条) 不好还原,
     # 这里用一个务实口径: 落盘数 / min(候选数, 12)
     attempted = min(n, 12) if n else 0
-    dims["download"] = clamp(pct(len(clips), attempted)) if attempted else None
-    if attempted and not clips:
-        notes.append("一支都没下下来: 登录态失效 / 被限速 / 下载器没接这个平台")
+    if not clips and stale:
+        # 候选池刚换过(改了关键词), 这批还没跑过下载 —— 这跟"下载失败"是两回事,
+        # 记 0 分会让趋势线看起来像倒退, 掩盖真实变化
+        dims["download"] = None
+        notes.append("当前候选池还没跑过下载, 下载/匹配/画面三项本轮不计分 "
+                     "(先跑 download_cross_platform 或 douyin_download_picks 再评)")
+    else:
+        dims["download"] = clamp(pct(len(clips), attempted)) if attempted else None
+        if attempted and not clips:
+            notes.append("一支都没下下来: 登录态失效 / 被限速 / 下载器没接这个平台")
 
     # ── relevance 街舞匹配度 ──
     judged = [verdicts[vid_of(c)] for c in clips if vid_of(c) in verdicts]
