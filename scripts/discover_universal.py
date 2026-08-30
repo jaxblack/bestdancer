@@ -62,6 +62,22 @@ RESOLVED_PLATFORMS = _resolve_list(args.platforms, "platforms",
     ["tiktok","youtube","instagram","bilibili","douyin"])  # xhs 已停用 (2026-07)
 RESOLVED_KEYWORDS = _resolve_list(args.keywords, "keywords",
     ["urban dance choreography","hiphop 编舞","kpop dance cover","jazz 编舞","street dance","choreography"])
+
+
+def keywords_for(platform: str) -> list[str]:
+    """按平台取关键词。
+
+    各平台的搜索语义差很多: 抖音搜"舞"会捞回一堆手势舞和资讯号 (实测采集评分里
+    街舞匹配度只有 33), 而 TikTok 搜中文词几乎没结果。所以 settings.json 支持
+    platform_keywords 覆盖, 没配就退回全局 keywords。命令行 --keywords 优先级最高。
+    """
+    if args.keywords:
+        return RESOLVED_KEYWORDS
+    per = (_settings.get("platform_keywords") or {}).get(platform)
+    if isinstance(per, list) and per:
+        return [str(x).strip() for x in per if str(x).strip()]
+    return RESOLVED_KEYWORDS
+
 if args.recent_days is None:
     args.recent_days = int(_settings.get("recent_days", 7))
 print(f"Using platforms={RESOLVED_PLATFORMS}", flush=True)
@@ -94,49 +110,66 @@ def infer_dance(text: str) -> str:
 
 
 def search_and_wait(page, label: str, home_url: str, search_url_tpl: str, kw: str,
-                    card_selector: str, input_selector: str, timeout_s: float = 30.0) -> int:
+                    card_selector: str, input_selector: str, timeout_s: float = 30.0,
+                    require_in_url: str | None = None) -> int:
     """拟人搜索 → 等结果渲染 → 渲染不出来就回退到规范搜索 URL 再等一次。
 
-    两个实测坑:
+    三个实测坑:
       1. 结果懒加载 (抖音 ~12s), 之前 idle 几秒就抓 DOM, 常年 0 条被误判为风控;
       2. 从首页搜索框回车, 抖音会落到 /jingxuan/search/<kw> 这个另一套版式,
-         里面根本没有 a[href*="/video/"], 必须回退到 /search/<kw>?type=video。
+         里面根本没有 a[href*="/video/"], 必须回退到 /search/<kw>?type=video;
+      3. 有些平台的筛选条件写在 URL 参数里 (YouTube 的 sp=「本周内」)。从搜索框
+         打字回车会落到**不带该参数**的普通结果页, 筛选静默失效 —— 搜回来全是几年前
+         的视频。require_in_url 指定必须出现在最终 URL 里的标记, 缺了就强制跳转。
     """
     human_search(page, home_url, search_url_tpl, kw, search_input_selector=input_selector)
     n = wait_for_cards(page, card_selector, timeout_s=timeout_s)
-    if n == 0:
+    need_redirect = n == 0 or (require_in_url and require_in_url not in (page.url or ""))
+    if need_redirect:
+        why = "无结果" if n == 0 else f"URL 缺少 {require_in_url} (筛选没生效)"
         try:
             page.goto(search_url_tpl.format(kw=quote(kw)),
                       wait_until="domcontentloaded", timeout=45_000)
         except Exception:
             pass
         n = wait_for_cards(page, card_selector, timeout_s=timeout_s)
-        print(f"[{label}] {kw!r} 首页搜索版式无结果, 回退规范搜索 URL -> {n}", flush=True)
+        print(f"[{label}] {kw!r} 首页搜索{why}, 改走规范搜索 URL -> {n}", flush=True)
     else:
         print(f"[{label}] {kw!r} results rendered: {n}", flush=True)
     return n
 
 def parse_compact_number(s: str) -> int:
     s = (s or "").strip().replace(",", "")
-    m = re.match(r"^([\d.]+)\s*([KkMmWw万])?$", s)
+    # 容忍量词后缀: "42万次观看" / "1.2K views" / "3.4亿播放"
+    s = re.sub(r"\s*(次观看|次播放|观看|播放|views?|plays?|likes?|个赞)\s*$", "", s, flags=re.I)
+    m = re.match(r"^([\d.]+)\s*([KkMmBbWw万亿千])?$", s.strip())
     if not m: return 0
     v = float(m.group(1))
     unit = (m.group(2) or "").lower()
-    return int(v * {"k":1_000,"m":1_000_000,"w":10_000,"万":10_000}.get(unit, 1))
+    return int(v * {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000,
+                    "w": 10_000, "万": 10_000, "亿": 100_000_000, "千": 1_000}.get(unit, 1))
 
 def parse_date(s: str) -> str | None:
     """Return YYYY-MM-DD if we can parse, else None. Handles: '3天前', '2小时前',
-    '2024-11-16', '5-31', '07-08', 'Jul 15', etc."""
+    '3周前', '7个月前', '1年前', '2024-11-16', '5-31', '07-08', 'Jul 15', etc."""
     if not s: return None
     s = s.strip()
     today = dt.date.today()
-    m = re.match(r"^(\d+)\s*(天|小时|分钟|day|hour|minute)s?\s*(ago|前)?$", s, re.I)
+    # 相对时间。YouTube 中文界面用"周前/个月前/年前", 之前完全没覆盖 ->
+    # published_at 恒为 None, 时效维度直接瞎掉 (采集评分实测 youtube 日期解析率 0%)
+    m = re.match(r"^(\d+)\s*(个?月|周|星期|天|小时|分钟|"
+                 r"month|week|day|hour|minute|year|年)s?\s*(ago|前)?$", s, re.I)
     if m:
-        n = int(m.group(1)); unit = m.group(2)
-        if unit in ("天","day"):
+        n = int(m.group(1)); unit = m.group(2).lower()
+        if unit in ("天", "day"):
             return (today - dt.timedelta(days=n)).isoformat()
-        else:
-            return today.isoformat()
+        if unit in ("周", "星期", "week"):
+            return (today - dt.timedelta(weeks=n)).isoformat()
+        if unit in ("月", "个月", "month"):
+            return (today - dt.timedelta(days=30 * n)).isoformat()
+        if unit in ("年", "year"):
+            return (today - dt.timedelta(days=365 * n)).isoformat()
+        return today.isoformat()   # 小时/分钟级 = 今天
     if s in ("昨天","yesterday","Yesterday"):
         return (today - dt.timedelta(days=1)).isoformat()
     if s in ("今天","today","Today"):
@@ -272,10 +305,15 @@ def discover_tiktok(page, kw: str, per_kw: int) -> list[dict]:
     return out[:per_kw]
 
 def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
-    # sp=EgIIBQ%3D%3D = "this week" filter
-    human_search(page, "https://www.youtube.com",
-                 "https://www.youtube.com/results?search_query={kw}&sp=EgIIBQ%253D%253D",
-                 kw, search_input_selector='input#search, input[name="search_query"]')
+    # sp 是 YouTube 的筛选 protobuf。两个坑:
+    #   1. 之前用的 EgIIBQ%3D%3D 其实是「今年内」不是「本周内」(本周内是 IIAw),
+    #      所以搜回来一堆几个月前的; 这里用 EgQIAxAB = 上传时间「本周」+ 类型「视频」。
+    #   2. 值里的 %3D 不能再编码一次 —— 写成 %253D YouTube 直接忽略整个参数。
+    search_and_wait(page, "youtube", "https://www.youtube.com",
+                    "https://www.youtube.com/results?search_query={kw}&sp=EgQIAxAB", kw,
+                    "ytd-video-renderer, ytd-rich-item-renderer",
+                    'input#search, input[name="search_query"]',
+                    require_in_url="sp=")
     for _ in range(random.randint(2, 4)):
         human_scroll(page, total=random.randint(1800, 2800))
         idle(0.7, 1.9)
@@ -284,12 +322,15 @@ def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
         renderers.map(r => {
             const a = r.querySelector('a#video-title, a#thumbnail');
             const title_el = r.querySelector('#video-title');
-            const meta = r.querySelector('#metadata-line');
             const channel = r.querySelector('#channel-name, ytd-channel-name');
+            // #metadata-line 的 textContent 里全是换行和空白, 按 • 切会切出带换行的脏
+            // token, 正则一个都匹配不上。直接取渲染好的 span 列表干净得多。
+            const bits = [...r.querySelectorAll('#metadata-line span, .inline-metadata-item')]
+                .map(s => s.textContent.trim()).filter(Boolean);
             return {
                 href: a?.href || '',
                 title: title_el?.textContent?.trim() || '',
-                meta: meta?.textContent?.trim() || '',
+                bits: [...new Set(bits)],
                 channel: channel?.textContent?.trim() || '',
             };
         }).filter(r => r.href.includes('/watch?v='))
@@ -298,18 +339,17 @@ def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
     for c in cards[:per_kw*2]:
         vid_m = re.search(r"[?&]v=([\w-]+)", c["href"])
         if not vid_m: continue
-        text = f"{c['title']} {c['meta']}"
+        bits = c.get("bits") or []
+        text = f"{c['title']} {' '.join(bits)}"
         if EXCLUDE.search(text): continue
         published = None; like = 0
-        # views + published in meta_line: "5.4K views • 3 days ago"
-        for tok in re.split(r"[•·|]", c["meta"]):
-            tok = tok.strip()
+        for tok in bits:
             d = parse_date(tok)
-            if d and not published: published = d
-            m = re.match(r"^([\d.]+)\s*[KkMm]?\s*(views|次观看)?$", tok, re.I)
-            if m:
-                n = parse_compact_number(tok.split()[0])
-                if n > like: like = n
+            if d and not published:
+                published = d
+                continue
+            n = parse_compact_number(tok)
+            if n > like: like = n
         out.append({"id": vid_m.group(1), "platform": "youtube",
                     "url": f"https://www.youtube.com/watch?v={vid_m.group(1)}",
                     "title": c["title"][:200], "author": c["channel"][:80],
@@ -494,7 +534,7 @@ with sync_playwright() as p_ctx:
         page = ctx.new_page()
         consecutive_fail = 0
         try:
-            kws_shuffled = list(keywords)
+            kws_shuffled = keywords_for(platform)[:]
             random.shuffle(kws_shuffled)
             for kw_i, kw in enumerate(kws_shuffled):
                 try:

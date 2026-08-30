@@ -17,5 +17,34 @@
   "min_likes": 0,
   "videos_only": true,
   "recent_days": 7,
-  "sort_by": "heat_desc"
+  "sort_by": "heat_desc",
+  "platform_keywords": {
+    "douyin": [
+      "urban编舞",
+      "爵士编舞",
+      "kpop翻跳",
+      "hiphop编舞",
+      "舞蹈工作室 编舞",
+      "编舞 完整版"
+    ],
+    "tiktok": [
+      "urban dance choreography",
+      "kpop dance cover",
+      "hiphop choreography",
+      "jazz funk choreography",
+      "dance choreography"
+    ],
+    "youtube": [
+      "urban dance choreography",
+      "kpop dance cover",
+      "hiphop choreography",
+      "jazz funk choreography"
+    ],
+    "instagram": [
+      "urbandance",
+      "choreography",
+      "kpopcover",
+      "dancereels"
+    ]
+  }
 }

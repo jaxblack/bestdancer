@@ -28,7 +28,22 @@ def _split(cli, key):
 
 platforms = _split(args.platforms, "platforms")
 keywords = _split(args.keywords, "keywords")
-print(f"orchestrator: platforms={platforms} keywords={keywords}", flush=True)
+
+
+def keywords_for(platform: str) -> list[str]:
+    """按平台取关键词 (settings.json:platform_keywords), 没配就用全局。
+    各平台搜索语义差很多: 抖音搜"舞"全是手势舞, TikTok 搜中文几乎没结果。"""
+    if args.keywords:
+        return keywords
+    per = (settings.get("platform_keywords") or {}).get(platform)
+    if isinstance(per, list) and per:
+        return [str(x).strip() for x in per if str(x).strip()]
+    return keywords
+
+
+print(f"orchestrator: platforms={platforms}", flush=True)
+for _p in platforms:
+    print(f"  {_p}: {keywords_for(_p)}", flush=True)
 
 cand_dir = REPO / "assets" / "incoming" / args.week / "candidates"
 cand_dir.mkdir(parents=True, exist_ok=True)
@@ -39,8 +54,9 @@ for p in platforms:
     if fp.exists(): fp.unlink()
 
 for p in platforms:
-    for i, kw in enumerate(keywords):
-        print(f"\n════ {p} × {kw} ({i+1}/{len(keywords)}) ════", flush=True)
+    kws = keywords_for(p)
+    for i, kw in enumerate(kws):
+        print(f"\n════ {p} × {kw} ({i+1}/{len(kws)}) ════", flush=True)
         cmd = [sys.executable, "-u", "scripts/discover_universal.py",
                "--week", args.week, "--platforms", p, "--keywords", kw,
                "--pool-size", str(args.pool_size),
