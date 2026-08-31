@@ -432,6 +432,9 @@ def instagram_post_meta(page, url: str) -> dict | None:
             desc: document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '',
             ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '',
             dt: document.querySelector('time')?.getAttribute('datetime') || '',
+            ogVideo: document.querySelector('meta[property="og:video"], meta[property="og:video:secure_url"]')?.getAttribute('content') || '',
+            hasVideo: !!document.querySelector('video'),
+            ogType: document.querySelector('meta[property="og:type"]')?.getAttribute('content') || '',
         })""")
     except Exception:
         return None
@@ -470,6 +473,8 @@ def instagram_post_meta(page, url: str) -> dict | None:
     if author == "unknown" and not like and not published:
         return None
     return {"author": author, "like": like, "published_at": published,
+            "is_video": bool(info.get("ogVideo") or info.get("hasVideo")
+                             or info.get("ogType") == "video.other"),
             "title": re.sub(r"\s+", " ", title).strip()}
 
 
@@ -554,9 +559,12 @@ def discover_instagram(page, kw: str, per_kw: int) -> list[dict]:
             code = m.get("code")
             if not code or code in seen:
                 continue
-            # media_type: 1=图片 2=视频。栏目只要视频
-            vt = m.get("media_type")
-            if vt not in (2, None) and not m.get("video_versions"):
+            desc = m.get("desc") if isinstance(m.get("desc"), str) else ""
+            # media_type: 1=图片 2=视频。栏目只要视频 —— 之前把 media_type 缺失的也放行,
+            # 还一律拼成 /reel/ 链接, 结果图片帖也进了候选池, 下载时全报
+            # "No video formats found"。
+            is_video = (m.get("media_type") == 2) or bool(m.get("video_versions"))
+            if not is_video:
                 continue
             caption = m.get("caption")
             text = (caption or {}).get("text", "") if isinstance(caption, dict) else ""
@@ -588,16 +596,21 @@ def discover_instagram(page, kw: str, per_kw: int) -> list[dict]:
     except Exception:
         anchors = []
     budget = max(0, min(INSTAGRAM_ENRICH_BUDGET, per_kw - len(out)))
-    todo = [u for u in anchors
-            if (re.search(r"/(?:reel|p)/([\w-]+)", u) or [None])
-            and re.search(r"/(?:reel|p)/([\w-]+)", u).group(1) not in seen][:budget]
+    # /p/ 也要看: 网格里绝大多数链接是 /p/, 里面同样有大量视频帖, 只认 /reel/ 会
+    # 把候选量砍到个位数。是不是视频交给详情页判断 (og:video / <video>)。
+    todo = []
+    for u in anchors:
+        m = re.search(r"/(?:reel|p)/([\w-]+)", u)
+        if m and m.group(1) not in seen:
+            todo.append((m.group(1), u))
+        if len(todo) >= budget:
+            break
     if todo:
         print(f"[instagram] {kw!r} 网格另有 {len(anchors)} 条, 逐个补元数据 {len(todo)} 条",
               flush=True)
-    for u in todo:
-        code = re.search(r"/(?:reel|p)/([\w-]+)", u).group(1)
+    for code, u in todo:
         meta = instagram_post_meta(page, u)
-        if not meta:
+        if not meta or not meta.get("is_video"):
             continue
         if EXCLUDE.search(meta.get("title", "")):
             continue

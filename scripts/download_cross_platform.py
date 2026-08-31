@@ -11,6 +11,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
@@ -28,6 +29,50 @@ DL2.mkdir(parents=True, exist_ok=True)
 COOKIES = BASE / "cookies.txt"
 
 PLATFORMS = [p for p in args.platforms.split("|") if p]
+
+COOKIE_DOMAINS = {
+    "youtube": ".youtube.com", "tiktok": ".tiktok.com",
+    "instagram": ".instagram.com", "bilibili": ".bilibili.com",
+    "xiaohongshu": ".xiaohongshu.com",
+}
+
+
+def refresh_cookies(platform: str) -> bool:
+    """下载前从 CDP 浏览器现取一份 cookies。
+
+    踩过的坑: cookies 文件是某次手动导出的快照, 用户之后才在浏览器里登录 ——
+    文件里缺 SID/SAPISID/LOGIN_INFO, yt-dlp 实际是**未登录**状态, 于是媒体流 403,
+    表现得极像"被限速/需要 PO token", 白排查很久。所以每次下载前都重新导一次。
+    """
+    domain = COOKIE_DOMAINS.get(platform)
+    if not domain:
+        return False
+    out = BASE / f"cookies_{platform}.txt"
+    script = REPO / "scripts" / "dump_cookies_from_cdp.py"
+    if not script.exists():
+        return False
+    try:
+        r = subprocess.run([sys.executable, str(script), domain, str(out)],
+                           capture_output=True, text=True, timeout=60)
+    except Exception:
+        return False
+    if r.returncode == 0 and out.exists():
+        names = set()
+        for line in out.read_text().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 7:
+                names.add(parts[5])
+        print(f"[{platform}] 已刷新 cookies ({len(names)} 个)", flush=True)
+        # 关键登录 cookie 缺失就明说, 别让它以"限速"的面目出现
+        need = {"youtube": {"SID", "SAPISID", "LOGIN_INFO"},
+                "instagram": {"sessionid"}, "tiktok": {"sessionid"}}.get(platform, set())
+        missing = need - names
+        if missing:
+            print(f"[{platform}] ⚠️ 缺少登录 cookie {sorted(missing)} —— "
+                  f"请在调试 Chrome 里登录该站后重试", flush=True)
+        return True
+    return False
+
 
 BOT_CHECK_MARKERS = ("sign in to confirm", "not a bot", "login required",
                      "private video", "members-only")
@@ -186,15 +231,41 @@ def process_platform(platform: str) -> int:
         out = DL2 / f"{platform}_{vid}.%(ext)s"
         target_mp4 = DL2 / f"{platform}_{vid}.mp4"
         if target_mp4.exists() and target_mp4.stat().st_size > 300_000:
+            # 视频已在, 但归一化后的 <平台>_<id>.json 可能还没写 (上一轮被误判失败,
+            # 或中断过)。这份 json 是 build_week 取权威作者/标题的来源, 缺了成片就会
+            # 退回用爬来的候选文本, 署名容易对不上 —— 补一份再跳过。
+            norm_path = DL2 / f"{platform}_{vid}.json"
+            if not norm_path.exists():
+                norm_path.write_text(json.dumps({
+                    "id": vid, "platform": platform, "source": it.get("source", platform),
+                    "desc": (it.get("source_desc") or it.get("title") or "")[:500],
+                    "author": (it.get("creator") or it.get("author") or "").lstrip("@"),
+                    "duration_sec": int(it.get("duration_sec") or 0),
+                    "like": int(it.get("like") or 0),
+                    "play_count": int(it.get("play") or 0),
+                    "tags": it.get("tags", []) or [],
+                    "url": url,
+                    "dance_type": infer_dance_type(
+                        f"{it.get('title','')} {it.get('source_desc','')}"),
+                }, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"[{platform}] {vid} 已有视频, 补写元数据 json")
             print(f"[{platform}] {vid} already downloaded, skipping")
             downloaded += 1
             continue
         print(f"[{platform}] downloading {url}", flush=True)
         ok, meta = yt_dlp_download(url, str(out), platform)
-        # find the actual downloaded file (yt-dlp may pick different ext)
-        real_mp4 = next(DL2.glob(f"{platform}_{vid}.*"), None)
+        # 找真正下下来的视频文件。注意不能直接 glob(f"{platform}_{vid}.*") 取第一个 ——
+        # 目录里还有 yt-dlp 写的 <id>.info.json 边车, glob 顺序不保证, 经常先撞上它,
+        # 于是 17KB 的 JSON 被当成"视频太小"判定下载失败, 而 mp4 其实已经好好躺在那儿。
+        sidecar_suffixes = (".json", ".info", ".ytdl", ".part")
+        real_mp4 = next((f for f in sorted(DL2.glob(f"{platform}_{vid}.*"))
+                         if f.suffix == ".mp4" and not f.name.endswith(".info.mp4")), None)
+        if real_mp4 is None:
+            real_mp4 = next((f for f in sorted(DL2.glob(f"{platform}_{vid}.*"))
+                             if f.suffix not in sidecar_suffixes
+                             and not f.name.endswith(".info.json")), None)
         # normalize non-.mp4 files
-        if real_mp4 and real_mp4.suffix != ".mp4" and real_mp4.suffix not in (".info", ".json"):
+        if real_mp4 and real_mp4.suffix != ".mp4":
             new_path = real_mp4.with_suffix(".mp4")
             try:
                 real_mp4.rename(new_path)
@@ -239,6 +310,7 @@ def process_platform(platform: str) -> int:
 if __name__ == "__main__":
     total = 0
     for platform in PLATFORMS:
+        refresh_cookies(platform)
         ok, why = platform_ready(platform)
         if not ok:
             print(f"[{platform}] 跳过 —— {why}", flush=True)
