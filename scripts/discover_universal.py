@@ -413,7 +413,7 @@ def discover_youtube(page, kw: str, per_kw: int) -> list[dict]:
                     "source_desc": text[:400], "keyword": kw})
     return out[:per_kw]
 
-INSTAGRAM_ENRICH_BUDGET = 14   # 每个关键词最多开这么多详情页补元数据
+INSTAGRAM_ENRICH_BUDGET = 20   # 每个关键词最多开这么多详情页补元数据
 
 
 def instagram_post_meta(page, url: str) -> dict | None:

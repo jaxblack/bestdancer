@@ -47,7 +47,8 @@ open output/2026-W31-C_demo.mp4
 | 症状 | 原因 | 处理 |
 |---|---|---|
 | `curl 9222` 不通，但 Chrome 明明带了参数 | Chrome 136+ 在默认 profile 上直接无视 `--remote-debugging-port` | 加 `--user-data-dir="$HOME/.chrome-debug-profile"` 起第二个实例 |
-| **YouTube 能发现但下不动**（0 字节 / 403） | YouTube 的 SABR + PO token 机制；本机出网还要过代理，媒体 URL 里签的 `ip=` 和实际下载连接的出口 IP 对不上 | 已知限制：**YouTube 当前只用于发现，不作为素材源**。`download_cross_platform.py` 的 `platform_ready()` 会在 75 秒内探明并整个平台跳过，不会卡住流水线。要真正下载需接 PO token provider（bgutil）或换稳定出口 IP |
+| **YouTube/Instagram 下载 0 字节或 403** | cookies 文件是登录**之前**导出的快照，缺 `SID`/`SAPISID`/`LOGIN_INFO`（YouTube）或 `sessionid`（IG），yt-dlp 实际未登录。症状酷似 SABR/PO token 限速，极易误判 | `download_cross_platform.py` 已会每次下载前从 CDP 重新导 cookies 并校验；手动排查用 `python3 scripts/dump_cookies_from_cdp.py .youtube.com <out>` 再看 `SID` 在不在 |
+| 下载明明成功却报 failed | 旧代码 `glob("<plat>_<id>.*")` 顺序不定，会先撞上 `.info.json` 边车，17KB 被判「视频太小」 | 已修：明确优先取 `.mp4` 并排除边车 |
 | 某平台候选有量但元数据全 0% | 该平台的提取器在爬 DOM，而页面网格里根本没有作者/点赞/日期 | 改走**接口拦截**：Instagram 截 `/graphql/query`，TikTok 截 `/api/search/item/full/`，字段齐全得多 |
 | 某平台一直 `-> 0 cards` | 结果是懒加载的（抖音要 ~12s），或首页搜索框把你带到了另一套版式（抖音 `/jingxuan/search/` 里没有 `a[href*="/video/"]`） | `search_and_wait()` 已处理：先轮询等结果，再回退到规范搜索 URL |
 | discover 跑完没生成 candidates | 旧代码在最后一个平台跑完后还要冷却 90-240s 才落盘，被上层 timeout 杀掉 | 已改成"每个平台跑完立刻落盘，最后一个平台不冷却" |

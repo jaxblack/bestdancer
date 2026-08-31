@@ -75,8 +75,14 @@ python3 pipeline/evaluate_discovery.py 2026-W31-C --compare  # 和历史对比
 |---|---|---|---|
 | 抖音 | ✅ | ✅ | 元数据最全；关键词必须用「编舞/翻跳」向，泛词匹配度只有 33 |
 | TikTok | ✅ | ✅ | 走 `/api/search/item/full/` 拦截拿真实 `createTime`；搜索按相关度排序，时效偏旧 |
-| Instagram | ✅ | ⚠️ | 走 `/graphql/query` 拦截 + 详情页补元数据；下载器尚未接 |
-| YouTube | ✅ | ❌ | 发现很好（本周内占比 100%）；**下载被 SABR/PO token 挡住，当前只作发现源** |
+| Instagram | ✅ | ✅ | 走 `/graphql/query` 拦截 + 详情页补元数据（只收视频帖）；候选量受补元数据预算限制 |
+| YouTube | ✅ | ✅ | 本周内占比 100%；**下载必须有新鲜登录 cookies**，见下 |
+
+> **cookies 过期会伪装成「被限速」**：cookies 文件是某次导出的快照。如果导出时还没登录，
+> 文件里会缺 `SID`/`SAPISID`/`LOGIN_INFO`，yt-dlp 实际是未登录状态，表现为媒体流 403、
+> HLS 卡在 0 字节、只放出 m3u8 不给 DASH——和 SABR/PO token 的症状一模一样，极易误判。
+> `download_cross_platform.py` 现在每次下载前都从 CDP 浏览器**重新导一份**，并检查关键
+> 登录 cookie 是否齐全，缺了直接提示「请先登录」。
 
 ## 每期流程
 
