@@ -123,6 +123,27 @@ def _drop_unbalanced_brackets(s: str) -> str:
     return s.strip(" ·-—_")
 
 
+TITLE_MAX = 15          # 上屏字数上限; 15 字在 F_SUB 下仍能整行放下, 由字号阶梯兜底
+                        # (宁可字小一点也要把话说完 —— 中文截断必成病句)
+
+
+def _first_clause(s: str, limit: int) -> str:
+    """取第一个完整句读作为标题; 太长再退回按边界截断。
+
+    中文没有空格, 按字数硬截必出病句。先按 ！？。，、；: 切, 拿第一段完整意思;
+    第一段本身还超长, 才走 _cut_clean。
+    """
+    s = (s or "").strip()
+    parts = [p for p in re.split(r"[！!？?。；;，,、\n]+", s) if p.strip()]
+    if parts:
+        first = parts[0].strip()
+        if 4 <= len(first) <= limit:
+            return first
+        if len(first) > limit:
+            return _cut_clean(first, limit)
+    return _cut_clean(s, limit)
+
+
 def _cut_clean(s: str, limit: int) -> str:
     """超长就截断, 但要停在自然边界, 别留下悬空的逗号或半个拉丁词
     (评估器点名过 "小丑狂欢夜 ib:ian25zs," 这种)。"""
@@ -145,7 +166,9 @@ def screen_title(raw: str, fallback: str = "") -> str:
 
     抖音 desc 通常是「正文 #话题 #话题 @小助手」, 直接截断会停在
     "#请问" 这种半截话题上 (评估器反复报"标题在不自然位置被截断")。
-    策略: 取第一个 # 之前的正文; 正文为空就挑第一个像样的话题词; 再不行用兜底词。
+    策略: 取第一个 # 之前的正文 → 再切到第一个句读, 拿一个**完整短句**上屏,
+    而不是硬截 N 个字 —— 中文没有空格, 硬截必然切出病句
+    ("每个女孩都有成为公主的内" / "《释怀》完整版来啦！尽力")。
     """
     raw = clean(raw or "")
     raw = re.sub(r"@[^\s#]+", " ", raw)          # 去掉 @小助手 之类
@@ -153,13 +176,13 @@ def screen_title(raw: str, fallback: str = "") -> str:
     raw = re.sub(r"\b(?:ib|inspired\s+by|cr|credit)\s*[:：].*$", " ", raw, flags=re.I)
     body = re.sub(r"\s+", " ", raw.split("#")[0]).strip(" ，,。.·-—_")
     if len(body) >= 4:
-        return _cut_clean(body, 22)
+        return _first_clause(body, TITLE_MAX)
     tags = [t.strip(" ，,。.·-—_") for t in re.findall(r"#([^#\s]+)", raw)]
     junk = re.compile(r"^(dou\+?|抖音|小助手|热门|推荐|涨粉|流量|dance|舞蹈)$", re.I)
     for t in tags:
         if len(t) >= 3 and not junk.match(t):
-            return _cut_clean(t, 22)
-    return _cut_clean(body or fallback, 22)
+            return _cut_clean(t, TITLE_MAX)
+    return _cut_clean(body or fallback, TITLE_MAX)
 
 
 def clean(s: str) -> str:
@@ -386,6 +409,8 @@ def render_titlecard(seg) -> Image.Image:
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     if seg["type"] == "intro":
+        # 片头现在压在 TOP1 的真片画面上, 加一层压暗蒙版保证大字读得清
+        d.rectangle([0, 0, W, H], fill=(8, 8, 16, 150))
         d.text((W / 2, 470), seg["title1"], font=F_HUGE, fill=CA, anchor="mm")
         d.text((W / 2, 578), seg["title2"], font=F_MID, fill=CB, anchor="mm")
         for i, ln in enumerate(wrap(d, seg["sub"], F_SUB, W - 2 * MARGIN)):
@@ -416,13 +441,19 @@ def render_overlay(seg) -> Image.Image:
     d.rounded_rectangle([-40, -40, W + 40, 246], radius=26, fill=(8, 8, 16, 168))
     tag_bg = ACCENT if seg["type"] == "top" else CB
     pill(d, W / 2, 32, seg["tag"], F_TAG, BG, tag_bg)
-    # 标题过长就自动降一号字，别再从中间截断（评估器反复报“标题右端被截断”）
+    # 标题按字号阶梯自适应, 一行放不下就降一号 —— 之前只试了 F_TITLE/F_MID 两档,
+    # 再放不下就被 wrap(...)[:1] 砍掉后半句, 成片上出现 "每个女孩都有成为公主的内"
+    # 这种病句 (评估器连着两轮点名)。加 F_SUB 兜底后不会再截断。
     title = seg.get("title", "")
+    avail = W - 2 * MARGIN
     t_font = F_TITLE
-    if title and d.textlength(title, font=t_font) > W - 2 * MARGIN:
-        t_font = F_MID
-    for ln in wrap(d, title, t_font, W - 2 * MARGIN)[:1]:
-        d.text((W / 2, 112), ln, font=t_font, fill=CA, anchor="mm")
+    for cand in (F_TITLE, F_MID, F_SUB):
+        t_font = cand
+        if d.textlength(title, font=cand) <= avail:
+            break
+    lines = wrap(d, title, t_font, avail)
+    if lines:
+        d.text((W / 2, 112), lines[0], font=t_font, fill=CA, anchor="mm")
     # 「@作者」是合规署名的载体（2026-08 决策：画面常驻 @作者 即满足署名要求，
     # 不写平台名保持画面干净）。所以这行要够清楚：白字、比正文大一号。
     byline = seg.get("creator", "").strip()
@@ -621,28 +652,76 @@ def scene_cuts(src, ff) -> list[float]:
             for m in re.finditer(r"pts_time:([\d.]+)", (r.stderr or "") + (r.stdout or ""))]
 
 
-def stable_window(src, want: float, total: float, ff) -> float:
-    """挑一个不跨镜头切换的起点, 让这一段画面连贯。
+def motion_profile(src, ff, fps=2, w=160, h=90) -> tuple[list[float], float]:
+    """按 fps 采样算逐帧运动量, 返回 (每帧运动量, 采样间隔秒)。
 
-    取相邻切点之间最长的一段; 若它够放下 want 秒, 就从那一段开头稍留余量处开始。
-    实在没有足够长的连续镜头 (纯快剪素材), 退回 0 保持原行为。
+    用来避开"片头队标/静态字卡"这种没人在动的片段 —— 评估器点名过
+    "第2名段前 5 秒还停留在队标画面, 浪费榜单展示时间"。
+    """
+    try:
+        r = subprocess.run(
+            [ff, "-v", "error", "-i", str(src),
+             "-vf", f"fps={fps},scale={w}:{h},format=gray",
+             "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+            capture_output=True, timeout=180)
+    except Exception:
+        return [], 1.0 / fps
+    buf = r.stdout or b""
+    frame = w * h
+    n = len(buf) // frame
+    if n < 3:
+        return [], 1.0 / fps
+    arr = np.frombuffer(buf[:n * frame], dtype=np.uint8).reshape(n, h, w).astype(np.int16)
+    diff = np.abs(np.diff(arr, axis=0)).mean(axis=(1, 2))
+    # 镜头切换会产生极大差值, 会把"最有动作的窗口"误导到切点上 —— 截顶压掉
+    if diff.size:
+        cap = float(np.percentile(diff, 85))
+        diff = np.minimum(diff, max(cap, 1e-6))
+    return diff.tolist(), 1.0 / fps
+
+
+def stable_window(src, want: float, total: float, ff) -> float:
+    """挑一个起点: 既不跨镜头切换, 又尽量落在真正有舞蹈动作的段落。
+
+    先按切点切成若干连续镜头, 只保留放得下 want 秒的; 再在这些候选起点里
+    选运动量最高的那个。没有足够长的连续镜头时, 退回按运动量在全片滑窗。
     """
     if total <= want + 0.5:
         return 0.0
     cuts = [c for c in scene_cuts(src, ff) if 0 < c < total]
-    if not cuts:
-        return 0.0
     bounds = [0.0] + cuts + [total]
-    best_start, best_len = 0.0, 0.0
+    motion, step = motion_profile(src, ff)
+
+    def score(start: float) -> float:
+        if not motion:
+            return 0.0
+        i0 = int(start / step)
+        i1 = max(i0 + 1, int((start + want) / step))
+        seg = motion[i0:i1]
+        return float(sum(seg) / len(seg)) if seg else 0.0
+
+    # 每个够长的连续镜头, 在它内部按步长撒若干候选起点 ——
+    # 只取镜头开头是不够的: 素材常常"前 5 秒队标 + 后面跳舞", 从开头进照样把
+    # 队标塞进成片。撒点后, 纯舞蹈那一段的运动量会自然胜出。
+    cands: list[float] = []
+    step_s = max(1.0, want / 8)
     for a, b in zip(bounds, bounds[1:]):
-        if b - a > best_len:
-            best_start, best_len = a, b - a
-    if best_len < want:
-        # 纯快剪素材, 没有够长的连续镜头。退而求其次: 从最长那段的开头进,
-        # 至少开头是完整镜头, 不会一上来就撞切点。
-        return min(best_start, max(0.0, total - want))
-    # 切点后留 0.3s 余量, 避开转场帧
-    return min(best_start + 0.3, max(0.0, total - want))
+        if (b - a) < want:
+            continue
+        t = a + 0.3
+        while t + want <= b:
+            cands.append(min(t, max(0.0, total - want)))
+            t += step_s
+    if not cands:
+        # 纯快剪素材: 直接在全片上滑窗找动作最密的一段
+        t = 0.0
+        while t + want <= total:
+            cands.append(t)
+            t += step_s
+        if not cands:
+            return 0.0
+    best = max(cands, key=score)
+    return round(min(best, max(0.0, total - want)), 2)
 
 
 def normalize_clip(src, dst, dur, ff, start=0.0):
@@ -727,10 +806,13 @@ def main() -> int:
                 print(f"[warn] SAPI 也失败({e2})，出无声样片")
 
     # 节奏: 每段 20s × 6 段 = 两分钟, 评估器反复报"榜单推进缓慢"。
-    # 收到 15s 上限后整片约 90s, 更贴合抖音/小红书的完播曲线。
-    default_dur = {"intro": 2.6, "top": 13.0, "classic": 13.0, "outro": 5.0}
+    # 收到 15s 上限后整片约 95s。但**每段都卡满同一个上限**又会显得机械
+    # (评估器原话: "各推荐段几乎都固定为15.2秒"), 所以让名次越靠前给的时间越多:
+    # 第5名 11s 起步, 第1名 15s, 既有节奏变化又把时间给到最值得看的那支。
+    default_dur = {"intro": 2.6, "top": 13.0, "classic": 12.0, "outro": 5.0}
     min_dur = {"intro": 2.2, "top": 10.0, "classic": 10.0, "outro": 5.0}
-    max_dur = {"intro": 3.0, "top": 15.0, "classic": 15.0, "outro": 6.0}
+    max_dur = {"intro": 3.0, "top": 15.0, "classic": 13.0, "outro": 6.0}
+    rank_max = {5: 11.5, 4: 12.5, 3: 13.5, 2: 14.5, 1: 15.5}
     timeline, t0, wavs = [], 0.0, []
     for i, s in enumerate(segs):
         wp = tts_dir / f"{i:02d}.wav"
@@ -753,6 +835,9 @@ def main() -> int:
         target = selected_dur or clip_dur or default_dur.get(s["type"], 4.0)
         dur = max(target, vo_dur, min_dur.get(s["type"], 3.0))
         dur = min(dur, max_dur.get(s["type"], 30.0))
+        # TOP 段按名次给不同上限, 避免每段都卡在同一个数字上显得机械
+        if s["type"] == "top" and s.get("rank") in rank_max:
+            dur = min(dur, max(rank_max[s["rank"]], min_dur["top"]))
         if selected_dur:
             dur = min(dur, selected_dur)
         if audio_ok:
@@ -767,8 +852,17 @@ def main() -> int:
                     target_durs=[e["adur"] for e in timeline])
 
     # 背景：有真片就归一化成竖屏，没有则占位
+    # 片头没有自己的素材, 但纯静态封面前 3 秒留不住人 (评估器一直报 hook_strength 低)。
+    # 拿 TOP1 的片子当片头背景, 开场就有舞蹈画面, 同时也预告了本期第一名。
+    top1_clip = None
+    for e in timeline:
+        if e["seg"]["type"] == "top" and e["seg"].get("rank") == 1:
+            top1_clip = find_clip(args.week, e["seg"].get("cid"))
+            break
     for i, e in enumerate(timeline):
         clip = find_clip(args.week, e["seg"].get("cid"))
+        if clip is None and e["seg"]["type"] == "intro" and top1_clip is not None:
+            clip = top1_clip
         if clip:
             dst = tmp_dir / f"bg_{i:02d}.mp4"
             want = e["adur"] + GAP
