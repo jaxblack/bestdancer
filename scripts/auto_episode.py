@@ -325,6 +325,15 @@ def step_build(week: str, edition: str, pool_path: Path) -> tuple[Path, list[str
     return daily.build_week(week, edition, pool_path=pool_path)
 
 
+def step_segments(target: str, model: str | None) -> int:
+    """逐段验收入选舞段: 舞种/标题/难度回写, 表现力太差的淘汰。
+    返回码 1 表示有段被淘汰, 需要重新组稿让后面的舞段顶上。"""
+    cmd = [PY, "-u", "pipeline/evaluate_segments.py", target, "--apply"]
+    if model:
+        cmd += ["--model", model]
+    return sh(cmd)
+
+
 def step_render(target: str) -> int:
     for sub in ("output/tts", "output/tmp"):
         p = REPO / sub / target
@@ -396,6 +405,10 @@ def main() -> int:
     ap.add_argument("--skip-download", action="store_true")
     ap.add_argument("--skip-verify", action="store_true",
                     help="跳过素材画面核对 (舞种/作者是否对得上)")
+    ap.add_argument("--skip-segments", action="store_true",
+                    help="跳过逐段验收 (舞种/标题/难度/表现力)")
+    ap.add_argument("--segment-rounds", type=int, default=2,
+                    help="逐段验收最多换几轮替补")
     ap.add_argument("--skip-render", action="store_true")
     ap.add_argument("--threshold", type=int, default=80, help="评估及格线")
     ap.add_argument("--max-attempts", type=int, default=2, help="不及格时最多重做几轮")
@@ -451,6 +464,21 @@ def main() -> int:
         for w in warnings:
             log(f"警告: {w}")
         log(f"配置就绪: {cfg_path.relative_to(REPO)}")
+
+        # 逐段验收: 表现力/竖版适配太差的直接淘汰, 由后面的舞段顶替名次。
+        # 放在渲染之前 —— 与其渲完再被整片评估打回, 不如先把烂素材换掉。
+        if not args.skip_segments:
+            for seg_round in range(args.segment_rounds):
+                if step_segments(target, args.model) == 0:
+                    break
+                log(f"有舞段被淘汰, 重新组稿让后面的顶上 (第 {seg_round + 1} 轮)")
+                try:
+                    cfg_path, warnings = step_build(week, edition, WEEKLY / f"{target}.json")
+                except SystemExit as e:
+                    log(f"替补不足, 无法重新组稿: {e}")
+                    break
+                for w in warnings:
+                    log(f"警告: {w}")
 
         if args.skip_render:
             log("按要求跳过渲染")
