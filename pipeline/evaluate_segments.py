@@ -182,7 +182,10 @@ def main() -> int:
         total = probe_dur(clip)
         want = rank_dur.get(pk.get("rank"), 13.0) if kind == "top" else 13.0
         want = min(want, max(total - 0.2, 1.0))
-        start = pk.get("clip_start_sec") or render.stable_window(clip, want, total, "ffmpeg")
+        start = (float(pk.get("clip_start_sec") or 0)
+                 if pk.get("clip_start_explicit")
+                 else (pk.get("clip_start_sec")
+                       or render.stable_window(clip, want, total, "ffmpeg")))
         key = f"{clip.name}:{start:.2f}:{want:.2f}:{fp}"
         jobs.append({"kind": kind, "pick": pk, "clip": clip, "total": total,
                      "start": float(start), "want": float(want), "key": key})

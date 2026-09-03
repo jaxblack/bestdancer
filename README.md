@@ -18,9 +18,9 @@ BestDancer 的目标不是某一个平台的热舞搬运或单站热榜，而是
 
 ```bash
 source .venv/bin/activate
-python3 scripts/auto_episode.py                 # 发现 → 下载 → 组稿 → 渲染 → 评估 → 闸门
+python3 scripts/auto_episode.py                 # 发现→下载→逐段验收→出片→评估→修改→再出片
 python3 scripts/auto_episode.py --skip-discover # 用现有候选池, 不再抓
-python3 scripts/auto_episode.py --threshold 85 --max-attempts 3
+python3 scripts/auto_episode.py --threshold 85 --max-attempts 5
 python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发布分支
 ```
 
@@ -28,6 +28,31 @@ python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发
 `~/.chrome-debug-profile` 拉一个（Chrome 136+ 在默认 profile 上会直接无视
 `--remote-debugging-port`，必须用独立 profile）。每一步都能单独 `--skip-*`，
 卡住不用从头再来。
+
+`--max-attempts` 控制真正的版本化闭环（默认 5 轮）：
+
+1. 渲染；
+2. evaluation 结构化输出问题和 `repair_actions`；
+3. 脚本直接执行建议（换段、改标题/舞种/难度/起点/段长/亮度、压缩全片节奏、
+   加强片头）；
+4. 重新组稿、渲染、评估，直到超过阈值，或没有新的可执行建议才停止。
+
+每一轮都不会删除：视频保存在 `output/<week>_demo_v1.mp4`、`v2.mp4`……，
+对应 config / manifest 同样带版本号；报告和抽帧保存在
+`output/eval/<week>/report_vN.json`、`frames_vN/`。`output/<week>_demo.mp4`
+始终是最新一版，已有发布脚本无需改路径。
+
+### 逐段舞蹈验收
+
+```bash
+python3 pipeline/evaluate_segments.py 2026-W31-C
+python3 pipeline/evaluate_segments.py 2026-W31-C --apply
+```
+
+它评的是**成片真正截取的时间窗**，逐段核对舞种、中文标题、初学者难度星级、
+表现力和竖版适配，给具体修改建议。综合低于 60、表现力低于 55 或模型明确判定
+`replace=true` 的舞段直接淘汰，后面的候选自动顺延顶替。`auto_episode.py`
+默认在每轮渲染前执行这一步。
 
 ### 成片评估闸门
 
@@ -43,6 +68,9 @@ python3 pipeline/evaluate_demo.py 2026-W31-C --no-llm   # 只跑硬指标
   画面上本来应该出现什么」一起交给本机 `codex exec`（`--image` 多模态 +
   `--output-schema` 结构化输出），从 content_accuracy / visual_quality /
   text_readability / pacing / hook_strength / compliance 六个维度打分并列出问题。
+- **可执行修改**：除了自然语言问题清单，evaluation 还必须输出有限集合的
+  `repair_actions`。流水线不再靠正则猜中文建议，而是按结构化动作直接修改下一版；
+  同一轮最多换两段，避免一次把整期风格全部打散。
 
 总分低于阈值或出现 blocker 即不及格（退出码 1），报告写在
 `output/eval/<week>/report.md`。闸门是 **fail-closed** 的：要求跑内容评估却没跑成，

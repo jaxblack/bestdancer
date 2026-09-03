@@ -184,6 +184,18 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
             desc = (meta.get("desc") or meta.get("title") or "").strip()
             if desc:
                 x = {**x, "title": re.sub(r"\s+", " ", desc.split("\n")[0])[:120]}
+        # evaluation 的明确修改必须最后应用, 不能被 vision / 平台元数据覆盖。
+        # 这些 override 会跨版本保留, 直到下一次 evaluation 再改。
+        if x.get("title_override"):
+            x = {**x, "title": x["title_override"]}
+        if x.get("creator_override"):
+            x = {**x, "creator": x["creator_override"]}
+        if x.get("dance_type_override"):
+            x = {**x, "dance_type": x["dance_type_override"]}
+        if x.get("difficulty_override"):
+            diff = copy.deepcopy(x.get("difficulty") or {})
+            diff["stars"] = int(x["difficulty_override"])
+            x = {**x, "difficulty": diff}
         dur = probe_dur(dl[vid])
         if dur > 180 or dur < 8: continue
         opts.append((x.get("like", 0), dur, x, dl[vid], vid))
@@ -213,18 +225,33 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
     # 关键 bug 防护: episode.week 也要同步, 不然 intro_vo 会读到模板的旧 week/edition
     if "episode" in cfg and isinstance(cfg["episode"], dict):
         cfg["episode"]["week"] = target
-    cfg["this_week_candidates"] = [copy.deepcopy(x) for x in a.get("this_week_candidates", []) if x.get("url","") not in used]
-    cfg["classics_pool"] = [copy.deepcopy(x) for x in a.get("classics_pool", []) if x.get("url","") not in used]
-    cfg["deleted_ids"] = []
+    # opts 里的记录已经叠加了 vision / 平台元数据 / evaluation override；renderer
+    # 实际从 this_week_candidates 取标题和舞种，不能再把原始 a 记录原样写回，否则
+    # pick 上虽然修了，画面仍显示旧字段。
+    effective = {t[2].get("url"): t[2] for t in opts if t[2].get("url")}
+    cfg["this_week_candidates"] = [
+        copy.deepcopy(effective.get(x.get("url"), x))
+        for x in a.get("this_week_candidates", [])
+        if x.get("url", "") not in used]
+    cfg["classics_pool"] = [
+        copy.deepcopy(effective.get(x.get("url"), x))
+        for x in a.get("classics_pool", [])
+        if x.get("url", "") not in used]
+    cfg["deleted_ids"] = list(a.get("deleted_ids", []))
 
-    def mkpick(rec, rank, dt=None, stars=3):
+    def mkpick(rec, rank, dt=None, stars=None):
         pp = copy.deepcopy(rec)
         # 舞种必须沿用候选自己的值 —— scripts/verify_clips.py 已经按**真实画面**
         # 校正过它。以前这里硬编码 "Urban", 于是画面是 K-pop 群舞、成片却写
         # "Urban 街舞", 评估器一抓一个准。
         dt = dt or (rec.get("dance_type") or "").strip() or "Urban"
+        previous = copy.deepcopy(rec.get("difficulty") or {})
+        if stars is None:
+            stars = int(previous.get("stars") or 3)
         pp["rank"] = rank; pp["dance_type"] = dt
-        pp["difficulty"] = {"stars": stars, "fit": dt, "scores": {}}
+        previous.update({"stars": stars, "fit": dt})
+        previous.setdefault("scores", {})
+        pp["difficulty"] = previous
         return pp
 
     cfg["picks"] = [mkpick(t[2], i+1) for i, t in enumerate(top)]

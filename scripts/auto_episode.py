@@ -9,15 +9,18 @@
 
 设计要点:
   * 每一步都能单独跳过, 卡住时不用从头再来;
-  * 评估不及格会自动"换素材再渲一次", 最多 --max-attempts 次;
+  * 每轮保留 output/<week>_demo_vN.mp4 + 对应 config/manifest/report/frames;
+  * 评估不及格会执行结构化修改建议再渲, 最多 --max-attempts 次;
   * 没及格就绝不进入发布分支 (评估脚本 fail-closed)。
 """
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -206,6 +209,8 @@ def build_pool_config(target: str, max_candidates: int, provisional_picks: int) 
     # 重跑 auto_episode 不该把它们冲掉 (否则被判为"非舞蹈"的素材又会溜回榜单)。
     prev_path = WEEKLY / f"{target}.json"
     prev_vision: dict[str, dict] = {}
+    prev_by_url: dict[str, dict] = {}
+    prev_render_settings: dict = {}
     prev_deleted: set[str] = set()
     prev_rejected_urls: set[str] = set()
     if prev_path.exists():
@@ -214,7 +219,10 @@ def build_pool_config(target: str, max_candidates: int, provisional_picks: int) 
         except json.JSONDecodeError:
             prev = {}
         prev_deleted = set(prev.get("deleted_ids", []))
+        prev_render_settings = copy.deepcopy(prev.get("render_settings") or {})
         for c in prev.get("this_week_candidates", []):
+            if c.get("url"):
+                prev_by_url[c["url"]] = c
             if c.get("url") and c.get("vision"):
                 prev_vision[c["url"]] = c
         # 已经被 verify 剔出候选池的, 靠 URL 记住 —— 候选 id 每轮重编号, 记 id 没用
@@ -252,20 +260,27 @@ def build_pool_config(target: str, max_candidates: int, provisional_picks: int) 
     carried = 0
     for cand in cfg["this_week_candidates"]:
         old = prev_vision.get(cand.get("url"))
-        if not old:
+        previous = prev_by_url.get(cand.get("url"))
+        if old:
+            cand["vision"] = old["vision"]
+            if old.get("dance_type"):
+                cand["dance_type"] = old["dance_type"]
+        if not previous:
             continue
-        cand["vision"] = old["vision"]
-        if old.get("dance_type"):
-            cand["dance_type"] = old["dance_type"]
         for key in ("creator", "title", "source_desc", "duration_sec", "local_path",
-                    "download_status"):
-            if old.get(key):
-                cand[key] = old[key]
+                    "download_status", "title_override", "dance_type_override",
+                    "creator_override", "difficulty_override",
+                    "target_duration_sec", "brightness",
+                    "clip_start_sec", "clip_start_explicit", "clip_end_sec"):
+            if previous.get(key) not in (None, ""):
+                cand[key] = previous[key]
         carried += 1
     if carried:
         print(f"[auto] 沿用上一轮画面核对结果 {carried} 支", flush=True)
 
     cfg["_rejected_urls"] = sorted(prev_rejected_urls)
+    if prev_render_settings:
+        cfg["render_settings"] = prev_render_settings
     cfg["picks"] = [dict(c, rank=i) for i, c in
                     enumerate(cfg["this_week_candidates"][:provisional_picks], 1)]
     cfg["classic_comeback"] = {}
@@ -343,6 +358,13 @@ def step_render(target: str) -> int:
 
 
 def step_evaluate(target: str, threshold: int, no_llm: bool, model: str | None) -> tuple[bool, dict]:
+    # 每轮先清当前槽位, 避免 evaluator 崩溃或 --no-llm 时把上一版的
+    # report/prompt/frames 错配到新视频上。带 vN 的归档不受影响。
+    eval_dir = REPO / "output" / "eval" / target
+    for name in ("report.json", "report.md", "prompt.md"):
+        (eval_dir / name).unlink(missing_ok=True)
+    shutil.rmtree(eval_dir / "frames", ignore_errors=True)
+
     cmd = [PY, "-u", "pipeline/evaluate_demo.py", target, "--threshold", str(threshold)]
     if no_llm:
         cmd.append("--no-llm")
@@ -359,11 +381,119 @@ def step_evaluate(target: str, threshold: int, no_llm: bool, model: str | None) 
     return rc == 0, report
 
 
-def apply_autofix(target: str, report: dict) -> bool:
-    """把评估里指名道姓的坏段落从候选池里剔掉, 让下一轮换素材重排。
+def next_version(target: str) -> int:
+    found = []
+    for path in (REPO / "output").glob(f"{target}_demo_v*.mp4"):
+        m = re.fullmatch(rf"{re.escape(target)}_demo_v(\d+)\.mp4", path.name)
+        if m:
+            found.append(int(m.group(1)))
+    return max(found, default=0) + 1
 
-    只处理"换掉这一段就能好"的问题 (黑屏 / 无真片 / 画面内容对不上);
-    别的问题交给人, 免得脚本在原地空转。
+
+def same_artifact(a: Path, b: Path) -> bool:
+    """copy2 会保留 mtime; 大视频用 size+mtime 判断即可, 避免每轮 hash 90MB。"""
+    if not a.exists() or not b.exists():
+        return False
+    sa, sb = a.stat(), b.stat()
+    return sa.st_size == sb.st_size and int(sa.st_mtime) == int(sb.st_mtime)
+
+
+def archive_iteration(target: str, version: int, report: dict | None = None,
+                      include_eval: bool = True,
+                      include_manifest: bool = True) -> Path:
+    """保留这一轮的 video / manifest / config / report / frames。
+
+    用户要能并排看 v1/v2/...，canonical 文件仍指向最新一版，发布脚本不用改。
+    """
+    out = REPO / "output"
+    video = out / f"{target}_demo.mp4"
+    versioned = out / f"{target}_demo_v{version}.mp4"
+    if video.exists():
+        shutil.copy2(video, versioned)
+
+    manifest = out / f"{target}_manifest.json"
+    if include_manifest and manifest.exists():
+        archived_manifest = json.loads(manifest.read_text())
+        archived_manifest["video"] = versioned.relative_to(REPO).as_posix()
+        (out / f"{target}_manifest_v{version}.json").write_text(
+            json.dumps(archived_manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8")
+    cfg = WEEKLY / f"{target}.json"
+    if cfg.exists():
+        shutil.copy2(cfg, out / f"{target}_config_v{version}.json")
+
+    eval_dir = out / "eval" / target
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    if include_eval:
+        for name in ("report.json", "report.md", "prompt.md"):
+            src = eval_dir / name
+            if src.exists():
+                stem, suffix = src.stem, src.suffix
+                dest = eval_dir / f"{stem}_v{version}{suffix}"
+                if name == "report.json":
+                    archived_report = json.loads(src.read_text())
+                    archived_report["video"] = versioned.relative_to(REPO).as_posix()
+                    dest.write_text(
+                        json.dumps(archived_report, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+                else:
+                    text = src.read_text()
+                    text = text.replace(
+                        f"output/{target}_demo.mp4",
+                        versioned.relative_to(REPO).as_posix())
+                    dest.write_text(text, encoding="utf-8")
+        frames = eval_dir / "frames"
+        if frames.exists():
+            shutil.copytree(frames, eval_dir / f"frames_v{version}",
+                            dirs_exist_ok=True)
+
+    summary = {
+        "version": version,
+        "video": versioned.relative_to(REPO).as_posix(),
+        "score": (report or {}).get("final_score"),
+        "passed": (report or {}).get("passed"),
+        "issues": len((report or {}).get("issues", [])),
+    }
+    history = eval_dir / "versions.jsonl"
+    with history.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(summary, ensure_ascii=False) + "\n")
+    log(f"保留 v{version}: {versioned.relative_to(REPO)}"
+        f" (分数 {summary['score']})")
+    return versioned
+
+
+def archive_existing_current(target: str) -> None:
+    """第一次进入新版循环时, 先把尚未编号的现有成片保成 v1。"""
+    video = REPO / "output" / f"{target}_demo.mp4"
+    if not video.exists():
+        return
+    versions = sorted(
+        (REPO / "output").glob(f"{target}_demo_v*.mp4"),
+        key=lambda p: int(re.search(r"_v(\d+)\.mp4$", p.name).group(1)))
+    if versions and same_artifact(video, versions[-1]):
+        return
+    report_path = REPO / "output" / "eval" / target / "report.json"
+    report = {}
+    eval_fresh = (report_path.exists()
+                  and report_path.stat().st_mtime >= video.stat().st_mtime)
+    manifest_path = REPO / "output" / f"{target}_manifest.json"
+    manifest_fresh = (manifest_path.exists()
+                      and manifest_path.stat().st_mtime >= video.stat().st_mtime)
+    if eval_fresh:
+        try:
+            report = json.loads(report_path.read_text())
+        except json.JSONDecodeError:
+            pass
+    archive_iteration(target, next_version(target), report,
+                      include_eval=eval_fresh,
+                      include_manifest=manifest_fresh)
+
+
+def apply_autofix(target: str, report: dict) -> bool:
+    """执行 evaluation 给出的结构化 repair_actions。
+
+    不再只会“评估拦截”。标题、舞种、难度、起点、时长、亮度、片头和换段都能
+    直接进入下一版；没有结构化动作时才用旧的 major visual/content 换段兜底。
     """
     cfg_path = WEEKLY / f"{target}.json"
     manifest_path = REPO / "output" / f"{target}_manifest.json"
@@ -372,26 +502,143 @@ def apply_autofix(target: str, report: dict) -> bool:
     cfg = json.loads(cfg_path.read_text())
     manifest = json.loads(manifest_path.read_text())
     seg_to_cid = {s["index"]: s.get("candidate_id") for s in manifest.get("segments", [])}
-
-    fixable_areas = ("黑屏", "素材", "content_accuracy", "visual_quality")
+    candidates = {c.get("id"): c for c in cfg.get("this_week_candidates", [])}
+    classics = {c.get("id"): c for c in cfg.get("classics_pool", [])}
+    picks = {p.get("id"): p for p in cfg.get("picks", [])}
+    classic = cfg.get("classic_comeback") or {}
+    before = json.dumps(cfg, sort_keys=True, ensure_ascii=False)
     bad_cids: set[str] = set()
+    replacements = 0
+    handled = 0
+    addressed_areas: dict[int, set[str]] = {}
+
+    def mark_addressed(seg_i: int, *areas: str) -> None:
+        addressed_areas.setdefault(seg_i, set()).update(areas)
+
+    def targets(cid: str | None) -> list[dict]:
+        if not cid:
+            return []
+        out = []
+        for obj in (candidates.get(cid), classics.get(cid), picks.get(cid),
+                    classic if classic.get("id") == cid else None):
+            if obj is not None:
+                out.append(obj)
+        return out
+
+    actions = (report.get("llm") or {}).get("repair_actions") or []
+    for action in actions:
+        kind = action.get("action")
+        seg_i = int(action.get("segment_index", -1))
+        cid = seg_to_cid.get(seg_i)
+        value_s = str(action.get("value_string") or "").strip()
+        try:
+            value_n = float(action.get("value_number") or 0)
+        except (TypeError, ValueError):
+            value_n = 0.0
+        rationale = action.get("rationale") or ""
+
+        if kind == "replace_segment" and cid and replacements < 2:
+            if cid not in bad_cids:
+                bad_cids.add(cid)
+                replacements += 1
+            mark_addressed(seg_i, "all")
+        elif kind == "retitle_segment" and cid and value_s:
+            for obj in targets(cid):
+                obj["title"] = value_s[:40]
+                obj["title_override"] = value_s[:40]
+            mark_addressed(seg_i, "text_readability", "content_accuracy")
+        elif kind == "set_creator" and cid and value_s:
+            creator = value_s if value_s.startswith("@") else "@" + value_s
+            for obj in targets(cid):
+                obj["creator"] = creator[:100]
+                obj["creator_override"] = creator[:100]
+            mark_addressed(seg_i, "compliance", "content_accuracy",
+                           "text_readability")
+        elif kind == "set_dance_type" and cid and value_s:
+            for obj in targets(cid):
+                obj["dance_type"] = value_s[:40]
+                obj["dance_type_override"] = value_s[:40]
+            mark_addressed(seg_i, "content_accuracy")
+        elif kind == "set_difficulty" and cid and 1 <= value_n <= 5:
+            for obj in targets(cid):
+                obj.setdefault("difficulty", {})["stars"] = int(round(value_n))
+                obj["difficulty_override"] = int(round(value_n))
+            mark_addressed(seg_i, "content_accuracy")
+        elif kind == "set_clip_start" and cid and value_n >= 0:
+            for obj in targets(cid):
+                obj["clip_start_sec"] = round(value_n, 2)
+                obj["clip_start_explicit"] = True
+            mark_addressed(seg_i, "visual_quality", "pacing",
+                           "hook_strength", "hook_per_segment")
+        elif kind == "shorten_segment" and cid and 10 <= value_n <= 15:
+            for obj in targets(cid):
+                obj["target_duration_sec"] = round(value_n, 2)
+            mark_addressed(seg_i, "pacing")
+        elif kind == "brighten_segment" and cid and 0.03 <= value_n <= 0.25:
+            for obj in targets(cid):
+                obj["brightness"] = round(
+                    max(-0.3, min(0.3, float(obj.get("brightness", 0)) + value_n)), 3)
+            mark_addressed(seg_i, "visual_quality")
+        elif kind == "shorten_all_segments" and 0.7 <= value_n <= 0.95:
+            settings = cfg.setdefault("render_settings", {})
+            settings["duration_scale"] = round(
+                min(float(settings.get("duration_scale", 1.0)), value_n), 3)
+        elif kind == "strengthen_intro":
+            settings = cfg.setdefault("render_settings", {})
+            if 1.6 <= value_n <= 2.6:
+                settings["intro_duration_sec"] = round(value_n, 2)
+            settings["intro_scrim_alpha"] = min(
+                int(settings.get("intro_scrim_alpha", 150)), 95)
+            settings["compact_intro"] = True
+        else:
+            continue
+        handled += 1
+        log(f"执行建议: {kind} seg={seg_i} value={value_s or value_n}"
+            f" — {rationale}")
+
+    # 兼容旧报告/模型漏 action。尤其不能出现“有别的 action，所以未处理的 blocker
+    # 被整个跳过”：v4 就曾有署名不一致 blocker，但模型只给片头/时长动作。
+    fixable_areas = ("黑屏", "素材", "content_accuracy", "visual_quality", "compliance")
     for issue in report.get("issues", []):
         if issue.get("severity") not in ("blocker", "major"):
             continue
+        seg_i = int(issue.get("segment_index", -1))
+        issue_areas = {a for a in fixable_areas
+                       if a in str(issue.get("area", ""))}
+        covered = addressed_areas.get(seg_i, set())
+        if "all" in covered or (issue_areas and issue_areas & covered):
+            continue
         if not any(a in str(issue.get("area", "")) for a in fixable_areas):
             continue
-        cid = seg_to_cid.get(issue.get("segment_index"))
-        if cid:
+        cid = seg_to_cid.get(seg_i)
+        if cid and cid not in bad_cids and replacements < 2:
             bad_cids.add(cid)
+            replacements += 1
 
-    if not bad_cids:
+    if bad_cids:
+        log(f"自动换段: {sorted(bad_cids)} 由后面的候选顶上")
+        cfg["deleted_ids"] = sorted(set(cfg.get("deleted_ids", [])) | bad_cids)
+        all_candidates = {**classics, **candidates}
+        rejected = {all_candidates[cid].get("url") for cid in bad_cids
+                    if cid in all_candidates and all_candidates[cid].get("url")}
+        cfg["_rejected_urls"] = sorted(
+            set(cfg.get("_rejected_urls", [])) | rejected)
+        cfg["this_week_candidates"] = [
+            c for c in cfg.get("this_week_candidates", [])
+            if c.get("id") not in bad_cids]
+        cfg["classics_pool"] = [
+            c for c in cfg.get("classics_pool", [])
+            if c.get("id") not in bad_cids]
+        cfg["picks"] = [
+            p for p in cfg.get("picks", []) if p.get("id") not in bad_cids]
+        if classic.get("id") in bad_cids:
+            cfg["classic_comeback"] = {}
+
+    after = json.dumps(cfg, sort_keys=True, ensure_ascii=False)
+    if after == before:
         return False
-    log(f"自动修复: 剔除有问题的段落素材 {sorted(bad_cids)}")
-    cfg["deleted_ids"] = sorted(set(cfg.get("deleted_ids", [])) | bad_cids)
-    cfg["this_week_candidates"] = [c for c in cfg.get("this_week_candidates", [])
-                                   if c.get("id") not in bad_cids]
-    cfg["picks"] = [p for p in cfg.get("picks", []) if p.get("id") not in bad_cids]
-    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
     return True
 
 
@@ -411,7 +658,8 @@ def main() -> int:
                     help="逐段验收最多换几轮替补")
     ap.add_argument("--skip-render", action="store_true")
     ap.add_argument("--threshold", type=int, default=80, help="评估及格线")
-    ap.add_argument("--max-attempts", type=int, default=2, help="不及格时最多重做几轮")
+    ap.add_argument("--max-attempts", type=int, default=5,
+                    help="render→evaluation→修改 的最多迭代轮数 (默认 5)")
     ap.add_argument("--max-candidates", type=int, default=60)
     ap.add_argument("--provisional-picks", type=int, default=12,
                     help="先下这么多支, 再从真正下到的里面挑 TOP5")
@@ -428,6 +676,7 @@ def main() -> int:
     week, edition = resolve_target(args.week, args.edition)
     target = f"{week}-{edition}"
     log(f"目标期号 = {target}")
+    archive_existing_current(target)
 
     if not args.skip_discover:
         if not ensure_cdp():
@@ -489,6 +738,7 @@ def main() -> int:
 
         passed, report = step_evaluate(target, args.threshold, args.no_llm, args.model)
         score = report.get("final_score")
+        archive_iteration(target, next_version(target), report)
         if passed:
             log(f"✅ 评估通过 (总分 {score} ≥ {args.threshold})")
             break
@@ -496,10 +746,10 @@ def main() -> int:
         for i in report.get("issues", [])[:8]:
             log(f"   [{i.get('severity')}] {i.get('area')}: {i.get('description')}")
         if attempt >= max_attempts:
-            log("重做次数用尽, 交给人工处理")
+            log(f"重做 {max_attempts} 轮仍未到阈值, 所有版本已保留供人工比较")
             return 1
         if not apply_autofix(target, report):
-            log("这些问题没法靠换素材自动解决, 交给人工处理")
+            log("evaluation 没有产生新的可执行修改, 停止空转; 已保留所有版本")
             return 1
         pool_path = WEEKLY / f"{target}.json"
 

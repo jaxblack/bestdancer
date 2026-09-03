@@ -271,7 +271,8 @@ def check_config(week: str, manifest: dict) -> tuple[dict, list[dict]]:
 OUTPUT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["overall_score", "verdict", "summary", "dimensions", "issues"],
+    "required": ["overall_score", "verdict", "summary", "dimensions", "issues",
+                 "repair_actions"],
     "properties": {
         "overall_score": {"type": "integer", "minimum": 0, "maximum": 100},
         "verdict": {"type": "string", "enum": ["pass", "revise", "reject"]},
@@ -313,6 +314,36 @@ OUTPUT_SCHEMA = {
                 },
             },
         },
+        "repair_actions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["action", "segment_index", "value_string",
+                             "value_number", "rationale"],
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "replace_segment",
+                            "retitle_segment",
+                            "set_creator",
+                            "set_dance_type",
+                            "set_difficulty",
+                            "set_clip_start",
+                            "shorten_segment",
+                            "brighten_segment",
+                            "shorten_all_segments",
+                            "strengthen_intro",
+                        ],
+                    },
+                    "segment_index": {"type": "integer"},
+                    "value_string": {"type": "string"},
+                    "value_number": {"type": "number"},
+                    "rationale": {"type": "string"},
+                },
+            },
+        },
     },
 }
 
@@ -347,6 +378,24 @@ verdict: pass=可以直接发; revise=要改了再发; reject=方向性错误得
 issues 里 severity 用 blocker(必须改)/major(建议改)/minor(可忍受);
 auto_fixable=true 表示这个问题能靠改渲染参数/重选片段/重生成文案解决,
 不需要重新去找素材。segment_index 用清单里的段号, 对不上就填 -1。
+
+最后把能自动执行的修改写进 repair_actions。它不是泛泛建议, 而是下一轮渲染会直接执行的
+动作, 必须严格使用下面的 action:
+- replace_segment: 整段表现力/画质/竖版适配很差, 换后面的候选顶上。value 留空/0。
+- retitle_segment: 标题错或不贴画面。value_string 放不超过 12 字的中文新标题。
+- set_creator: 画面里能清楚读到原作者水印、且与当前署名不一致。value_string 放准确的
+  @作者；无法确认哪个才对时不要猜, 用 replace_segment。
+- set_dance_type: 舞种标错。value_string 放正确舞种。
+- set_difficulty: 难度星级错。value_number 放 1-5。
+- set_clip_start: 选段起点明显不好、但同一原片后面可能更好。value_number 放建议的原片秒数;
+  只有你能从上下文确定原片时间时才用, 否则用 replace_segment。
+- shorten_segment: 某段拖沓。value_number 放下一版段长秒数(10-15)。
+- brighten_segment: 某段整体太暗但素材仍值得保留。value_number 放亮度增量(0.03-0.25)。
+- shorten_all_segments: 全片节奏慢。segment_index=-1, value_number 放缩放比例(0.7-0.95)。
+- strengthen_intro: 开场弱。segment_index=0, value_number 放新片头时长(1.6-2.6)。
+
+只给**确定能改善本轮问题**的动作; 不要为 minor 小问题乱改。单轮最多替换 2 段,
+避免整期风格一次全变。每个 blocker/major 如果有明确自动修法, 至少给一个 repair_action。
 """
 
 
@@ -507,14 +556,56 @@ def main() -> int:
             llm_error = (f"找不到 codex CLI (PATH 里没有, 也没在 VS Code 扩展里找到)。"
                          f" 可以用 {CODEX_ENV}=/path/to/codex 指定。")
         else:
-            frames = extract_frames(video, manifest, eval_dir / "frames",
-                                    args.frames_per_segment)
-            if not args.quiet:
-                print(f"[eval] 抽了 {len(frames)} 帧, 调 codex ({codex_bin}) 评分中…")
-            prompt = build_prompt(manifest, frames, tech_facts)
-            (eval_dir / "prompt.md").write_text(prompt, encoding="utf-8")
-            llm, llm_error = run_codex(codex_bin, prompt, frames, eval_dir,
-                                       args.model, args.timeout)
+            all_segments = manifest.get("segments", [])
+            dance_segments = [
+                seg for seg in all_segments if seg.get("type") in ("top", "classic")]
+            if args.frames_per_segment < 1 or not all_segments or not dance_segments:
+                detail = (
+                    f"frames_per_segment={args.frames_per_segment}, "
+                    f"segments={len(all_segments)}, dance_segments={len(dance_segments)}")
+                issues.append(issue(
+                    "blocker", "抽帧",
+                    f"视觉评估没有可用的舞段覆盖: {detail}",
+                    "frames_per_segment 必须 >=1，且 manifest 至少包含一个 top/classic 段"))
+                llm_error = f"视觉覆盖无效 ({detail}), 拒绝无舞段评分"
+                frames = []
+            else:
+                frames = extract_frames(video, manifest, eval_dir / "frames",
+                                        args.frames_per_segment)
+            counts: dict[int, int] = {}
+            for frame in frames:
+                counts[frame["segment_index"]] = counts.get(frame["segment_index"], 0) + 1
+            missing_frames = []
+            for seg in all_segments:
+                expected = 1 if seg["type"] in ("intro", "outro") else args.frames_per_segment
+                actual = counts.get(seg["index"], 0)
+                if actual < expected:
+                    missing_frames.append((seg["index"], actual, expected))
+            tech_facts["frame_coverage"] = {
+                "extracted": len(frames),
+                "expected": sum(
+                    1 if seg["type"] in ("intro", "outro") else args.frames_per_segment
+                    for seg in all_segments),
+                "missing_segments": missing_frames,
+            }
+            if llm_error:
+                pass
+            elif missing_frames:
+                detail = ", ".join(
+                    f"seg{idx}={actual}/{expected}"
+                    for idx, actual, expected in missing_frames)
+                issues.append(issue(
+                    "blocker", "抽帧",
+                    f"视觉评估抽帧不完整: {detail}",
+                    "检查 ffmpeg 解码错误；所有段落抽帧齐全后才能放行"))
+                llm_error = f"抽帧覆盖不完整 ({detail}), 拒绝无图/少图评分"
+            else:
+                if not args.quiet:
+                    print(f"[eval] 抽了 {len(frames)} 帧, 调 codex ({codex_bin}) 评分中…")
+                prompt = build_prompt(manifest, frames, tech_facts)
+                (eval_dir / "prompt.md").write_text(prompt, encoding="utf-8")
+                llm, llm_error = run_codex(codex_bin, prompt, frames, eval_dir,
+                                           args.model, args.timeout)
     if llm_error and not args.quiet:
         print(f"[eval] 内容评估未完成: {llm_error}", file=sys.stderr)
 
@@ -528,9 +619,11 @@ def main() -> int:
     has_blocker = any(i.get("severity") == "blocker" for i in issues)
     # 闸门 fail-closed: 要求跑内容评估却没跑成, 一律按不及格处理, 不能当"没问题"放行
     llm_missing = (not args.no_llm) and llm is None
+    # prompt 明确定义 revise="要改了再发"。只排除 reject 会让 revise 高分版进发布分支,
+    # 违反闸门语义；有 LLM 时必须明确 verdict=pass。
+    llm_pass = args.no_llm or (llm is not None and llm.get("verdict") == "pass")
     passed = (final >= args.threshold and not has_blocker
-              and not llm_missing
-              and not (llm and llm.get("verdict") == "reject"))
+              and not llm_missing and llm_pass)
 
     report = {
         "week": week,

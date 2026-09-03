@@ -309,14 +309,15 @@ def build_segments(cfg: dict) -> list[dict]:
         cand = cands.get(cid, {})
         osd = item.get("on_screen", {})
         stars = float(osd.get("stars", 0) or 0)
-        title = clean(cand.get("song") or cand.get("title", ""))
+        display_title = cand.get("title_override") or cand.get("song") or cand.get("title", "")
+        title = clean(display_title)
         tts_title = title.strip("《》")
         fit = diff.get("fit", "")
         moves = osd.get("core_moves", [])
         move0 = moves[0] if moves else "核心动作"
         _dt = cand.get("dance_type", "").strip() or "街舞"
         _creator = cand.get("creator", "").lstrip("@") or "编舞者"
-        _title = clean(cand.get("song") or cand.get("title") or "").strip("《》").strip()
+        _title = clean(display_title).strip("《》").strip()
         _tpl = tpl if top else tpl_classic
         default_vo = _tpl.format(rank=rank, dance_type=_dt, title=_title, creator=_creator)
         # 全局音色 / 语速覆盖 candidate 级别（除非候选自己写了 vo 且没显式勾选跟随全局；简化：直接用全局）
@@ -337,9 +338,12 @@ def build_segments(cfg: dict) -> list[dict]:
             "type": item.get("segment"), "cid": cid, "rank": rank, "vo": full_vo,
             "voice": _voice, "voice_rate": _rate,
             "clip_start_sec": float(cand.get("clip_start_sec") or 0),
+            "clip_start_explicit": bool(cand.get("clip_start_explicit")),
             "clip_end_sec": float(cand.get("clip_end_sec") or 0),
+            "target_duration_sec": float(cand.get("target_duration_sec") or 0),
+            "brightness": float(cand.get("brightness") or 0),
             "tag": osd.get("tag", ""), "stars": stars, "moves": moves[:3],
-            "title": screen_title(cand.get("song") or cand.get("title") or "",
+            "title": screen_title(display_title,
                                   fallback=cand.get("dance_type", "街舞")),
             "creator": clean(cand.get("creator", "")),
             "source": clean(cand.get("source", "")),
@@ -410,7 +414,8 @@ def render_titlecard(seg) -> Image.Image:
     d = ImageDraw.Draw(img)
     if seg["type"] == "intro":
         # 片头现在压在 TOP1 的真片画面上, 加一层压暗蒙版保证大字读得清
-        d.rectangle([0, 0, W, H], fill=(8, 8, 16, 150))
+        d.rectangle([0, 0, W, H],
+                    fill=(8, 8, 16, int(seg.get("scrim_alpha", 150))))
         d.text((W / 2, 470), seg["title1"], font=F_HUGE, fill=CA, anchor="mm")
         d.text((W / 2, 578), seg["title2"], font=F_MID, fill=CB, anchor="mm")
         for i, ln in enumerate(wrap(d, seg["sub"], F_SUB, W - 2 * MARGIN)):
@@ -724,12 +729,18 @@ def stable_window(src, want: float, total: float, ff) -> float:
     return round(min(best, max(0.0, total - want)), 2)
 
 
-def normalize_clip(src, dst, dur, ff, start=0.0):
+def normalize_clip(src, dst, dur, ff, start=0.0, brightness=0.0):
     # 保留原音轨（若有），供“真片自带 BGM”使用
+    filters = [
+        f"scale={W}:{H}:force_original_aspect_ratio=increase",
+        f"crop={W}:{H}",
+    ]
+    if brightness:
+        filters.append(f"eq=brightness={max(-0.3, min(0.3, brightness)):.3f}")
+    filters.append(f"fps={FPS}")
     subprocess.run([ff, "-y", "-loglevel", "error", "-ss", f"{start:.3f}", "-stream_loop", "-1",
-                    "-t", f"{dur:.3f}", "-i", str(src), "-vf",
-                    f"scale={W}:{H}:force_original_aspect_ratio=increase,"
-                    f"crop={W}:{H},fps={FPS}", "-pix_fmt", "yuv420p", str(dst)],
+                    "-t", f"{dur:.3f}", "-i", str(src), "-vf", ",".join(filters),
+                    "-pix_fmt", "yuv420p", str(dst)],
                    check=True)
 
 
@@ -748,6 +759,7 @@ def main() -> int:
     if not cfg_path.exists():
         cfg_path = cfg_dir / f"{args.week}.example.json"
     cfg = json.loads(cfg_path.read_text("utf-8"))
+    render_settings = cfg.get("render_settings") or {}
     selected_clip_ids = [pick.get("id") for pick in cfg.get("picks", []) if pick.get("id")]
     classic_id = cfg.get("classic_comeback", {}).get("id")
     if classic_id:
@@ -756,6 +768,20 @@ def main() -> int:
     if missing_clips:
         raise SystemExit("入选舞段尚未下载，拒绝渲染占位成片: " + ", ".join(missing_clips))
     segs = build_segments(cfg)
+    for seg in segs:
+        if seg["type"] == "intro":
+            seg["scrim_alpha"] = max(
+                60, min(190, int(render_settings.get("intro_scrim_alpha", 150))))
+            if render_settings.get("compact_intro"):
+                m = re.match(r"\d{4}-W(\d{1,2})(?:-([A-Z]))?", args.week)
+                week_no = int(m.group(1)) if m else ""
+                letter = m.group(2) if m else ""
+                ords = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
+                        "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八",
+                        "十九", "二十", "二十一", "二十二", "二十三", "二十四", "二十五",
+                        "二十六"]
+                edition = f"第{ords[ord(letter) - 65]}篇" if letter else ""
+                seg["vo"] = f"第{week_no}周热舞，{edition}" if week_no else "本周热舞"
 
     # ---- 文案 review 输出（控制台 + 文本文件）----
     review_lines = ["=" * 60, f"📝 文案 REVIEW ({args.week}) — 共 {len(segs)} 段", "=" * 60]
@@ -809,10 +835,15 @@ def main() -> int:
     # 收到 15s 上限后整片约 95s。但**每段都卡满同一个上限**又会显得机械
     # (评估器原话: "各推荐段几乎都固定为15.2秒"), 所以让名次越靠前给的时间越多:
     # 第5名 11s 起步, 第1名 15s, 既有节奏变化又把时间给到最值得看的那支。
-    default_dur = {"intro": 2.6, "top": 13.0, "classic": 12.0, "outro": 5.0}
-    min_dur = {"intro": 2.2, "top": 10.0, "classic": 10.0, "outro": 5.0}
+    default_dur = {"intro": float(render_settings.get("intro_duration_sec", 2.6)),
+                   "top": 13.0, "classic": 12.0, "outro": 5.0}
+    min_dur = {"intro": 1.6, "top": 10.0, "classic": 10.0, "outro": 5.0}
     max_dur = {"intro": 3.0, "top": 15.0, "classic": 13.0, "outro": 6.0}
-    rank_max = {5: 11.5, 4: 12.5, 3: 13.5, 2: 14.5, 1: 15.5}
+    duration_scale = max(0.6, min(1.0, float(render_settings.get("duration_scale", 1.0))))
+    max_dur["classic"] *= duration_scale
+    rank_max = {5: 11.5 * duration_scale, 4: 12.5 * duration_scale,
+                3: 13.5 * duration_scale, 2: 14.5 * duration_scale,
+                1: 15.5 * duration_scale}
     timeline, t0, wavs = [], 0.0, []
     for i, s in enumerate(segs):
         wp = tts_dir / f"{i:02d}.wav"
@@ -838,6 +869,8 @@ def main() -> int:
         # TOP 段按名次给不同上限, 避免每段都卡在同一个数字上显得机械
         if s["type"] == "top" and s.get("rank") in rank_max:
             dur = min(dur, max(rank_max[s["rank"]], min_dur["top"]))
+        if s.get("target_duration_sec"):
+            dur = min(dur, max(float(s["target_duration_sec"]), min_dur.get(s["type"], 3.0)))
         if selected_dur:
             dur = min(dur, selected_dur)
         if audio_ok:
@@ -867,7 +900,7 @@ def main() -> int:
             dst = tmp_dir / f"bg_{i:02d}.mp4"
             want = e["adur"] + GAP
             start = e["seg"].get("clip_start_sec", 0.0)
-            if not start:
+            if not e["seg"].get("clip_start_explicit") and not start:
                 # 人工没指定起点时, 自动挑一段不跨镜头切换的窗口
                 try:
                     probe = subprocess.check_output(
@@ -880,7 +913,7 @@ def main() -> int:
                 if start:
                     print(f"[cut] {clip.name} 避开镜头切换, 从 {start:.1f}s 起")
             try:
-                normalize_clip(clip, dst, want, ff, start)
+                normalize_clip(clip, dst, want, ff, start, e["seg"].get("brightness", 0.0))
                 e["bg"] = dst
                 e["src"] = clip.name
             except Exception as ex:  # noqa: BLE001
