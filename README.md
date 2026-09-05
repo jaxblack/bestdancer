@@ -29,6 +29,9 @@ python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发
 `--remote-debugging-port`，必须用独立 profile）。每一步都能单独 `--skip-*`，
 卡住不用从头再来。
 
+完整的发现、evaluation、版本化修改、音频目标和发布回执约定见
+[BestDancer 标准化出片与发布流程](docs/skills/standard-episode-workflow.md)。
+
 `--max-attempts` 控制真正的版本化闭环（默认 5 轮）：
 
 1. 渲染；

@@ -19,6 +19,7 @@ import argparse
 import copy
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -340,6 +341,45 @@ def step_build(week: str, edition: str, pool_path: Path) -> tuple[Path, list[str
     return daily.build_week(week, edition, pool_path=pool_path)
 
 
+def stage_existing_config(target: str, cfg: dict) -> list[str]:
+    """按现有 picks 的稳定 URL/video-id 重建 staging 硬链接。
+
+    每次 build_week 会清空 `<target>/*.mp4`，所以较早 vN 的 config 虽然保留，
+    它的 cN staging 可能已被后续版本替换。`--reuse-config` 必须能独立重渲任意版本。
+    """
+    stage = INCOMING / target
+    stage.mkdir(parents=True, exist_ok=True)
+    (stage / "dl2").mkdir(exist_ok=True)
+    for old in stage.glob("*.mp4"):
+        old.unlink()
+
+    downloads = daily.all_downloaded()
+    selected = list(cfg.get("picks", []))
+    if cfg.get("classic_comeback"):
+        selected.append(cfg["classic_comeback"])
+    missing = []
+    for pick in selected:
+        vid = daily.extract_vid(pick.get("url", ""))
+        src = downloads.get(vid or "")
+        if not vid or src is None or not src.exists():
+            missing.append(pick.get("id") or pick.get("url") or "?")
+            continue
+        platform = pick.get("platform") or pick.get("source") or ""
+        if not platform:
+            m = re.match(r"([a-z]+)_", src.name)
+            platform = m.group(1) if m else "unknown"
+        target_clip = stage / f"{pick['id']}__{platform}__{vid}.mp4"
+        os.link(src, target_clip)
+        dl_copy = stage / "dl2" / f"{platform}_{vid}.mp4"
+        if not dl_copy.exists():
+            os.link(src, dl_copy)
+        meta_src = src.with_suffix(".json")
+        meta_dest = stage / "dl2" / f"{platform}_{vid}.json"
+        if meta_src.exists() and not meta_dest.exists():
+            shutil.copy2(meta_src, meta_dest)
+    return missing
+
+
 def step_segments(target: str, model: str | None) -> int:
     """逐段验收入选舞段: 舞种/标题/难度回写, 表现力太差的淘汰。
     返回码 1 表示有段被淘汰, 需要重新组稿让后面的舞段顶上。"""
@@ -657,6 +697,8 @@ def main() -> int:
     ap.add_argument("--segment-rounds", type=int, default=2,
                     help="逐段验收最多换几轮替补")
     ap.add_argument("--skip-render", action="store_true")
+    ap.add_argument("--reuse-config", action="store_true",
+                    help="复用现有 picks/config，只重渲；适合调音频/视觉模板时避免无谓换榜")
     ap.add_argument("--threshold", type=int, default=80, help="评估及格线")
     ap.add_argument("--max-attempts", type=int, default=5,
                     help="render→evaluation→修改 的最多迭代轮数 (默认 5)")
@@ -684,11 +726,26 @@ def main() -> int:
             return 2
         step_discover(target, args.discover_timeout)
 
-    pool_path, n_fresh = build_pool_config(target, args.max_candidates, args.provisional_picks)
-    log(f"候选池: {n_fresh} 支未用过的新候选 -> {pool_path.relative_to(REPO)}")
-    if n_fresh == 0:
-        log("候选池是空的, 先跑 discover 或放宽去重")
-        return 2
+    if args.reuse_config:
+        pool_path = WEEKLY / f"{target}.json"
+        if not pool_path.exists():
+            log(f"--reuse-config 但配置不存在: {pool_path}")
+            return 2
+        current = json.loads(pool_path.read_text())
+        n_fresh = len(current.get("this_week_candidates", []))
+        log(f"复用现有阵容: picks={len(current.get('picks', []))} "
+            f"candidates={n_fresh}")
+        missing = stage_existing_config(target, current)
+        if missing:
+            log(f"复用配置的素材无法从 dl2 重建: {missing}")
+            return 2
+    else:
+        pool_path, n_fresh = build_pool_config(
+            target, args.max_candidates, args.provisional_picks)
+        log(f"候选池: {n_fresh} 支未用过的新候选 -> {pool_path.relative_to(REPO)}")
+        if n_fresh == 0:
+            log("候选池是空的, 先跑 discover 或放宽去重")
+            return 2
 
     if not args.skip_download:
         if not ensure_cdp():
@@ -706,7 +763,10 @@ def main() -> int:
         attempt += 1
         log(f"── 第 {attempt}/{max_attempts} 轮组稿 + 渲染 ──")
         try:
-            cfg_path, warnings = step_build(week, edition, pool_path)
+            if args.reuse_config and attempt == 1:
+                cfg_path, warnings = pool_path, []
+            else:
+                cfg_path, warnings = step_build(week, edition, pool_path)
         except SystemExit as e:
             log(f"组稿失败: {e}")
             return 3
@@ -764,7 +824,8 @@ def main() -> int:
 
     if args.publish:
         log("进入发布流程")
-        return sh([PY, "-u", "scripts/upload_to_douyin.py", "--week", target])
+        return sh([PY, "-u", "scripts/upload_to_douyin.py",
+                   "--week", target, "--publish"])
     log("未加 --publish, 到此为止 (发布仍需人工确认)")
     return 0
 

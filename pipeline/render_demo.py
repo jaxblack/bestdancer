@@ -416,13 +416,25 @@ def render_titlecard(seg) -> Image.Image:
         # 片头现在压在 TOP1 的真片画面上, 加一层压暗蒙版保证大字读得清
         d.rectangle([0, 0, W, H],
                     fill=(8, 8, 16, int(seg.get("scrim_alpha", 150))))
+        if seg.get("compact"):
+            d.text((W / 2, 490), "本周热舞 TOP5", font=F_MID,
+                   fill=CA, anchor="mm")
+            d.text((W / 2, 590), seg["week"], font=F_SMALL,
+                   fill=ACCENT, anchor="mm")
+            if seg.get("creator"):
+                d.text((W / 2, 666), seg["creator"], font=F_SMALL,
+                       fill=WHITE, anchor="mm")
+            return img
         d.text((W / 2, 470), seg["title1"], font=F_HUGE, fill=CA, anchor="mm")
         d.text((W / 2, 578), seg["title2"], font=F_MID, fill=CB, anchor="mm")
         for i, ln in enumerate(wrap(d, seg["sub"], F_SUB, W - 2 * MARGIN)):
             d.text((W / 2, 678 + i * 46), ln, font=F_SUB, fill=WHITE, anchor="mm")
         d.text((W / 2, 782), seg["week"], font=F_SMALL, fill=ACCENT, anchor="mm")
         pill(d, W / 2, 858, seg["foot"], F_TAG, BG, ACCENT)
-        d.text((W / 2, 946), "每周最火热舞 · 零基础也能跟", font=F_SMALL, fill=CB, anchor="mm")
+        d.text((W / 2, 946), "先收藏 · 再挑一支练", font=F_SMALL, fill=CB, anchor="mm")
+        if seg.get("creator"):
+            d.text((W / 2, 1006), seg["creator"], font=F_SMALL,
+                   fill=WHITE, anchor="mm")
     else:
         d.text((W / 2, 470), "谢谢观看", font=F_HUGE, fill=CA, anchor="mm")
         d.text((W / 2, 588), "关注追更 · 下周同一时间见", font=F_SUB, fill=WHITE, anchor="mm")
@@ -590,19 +602,27 @@ def ensure_bgm():
 
 
 def seg_bed(entry, i, dur, tmp, ff, bgm):
-    """该段背景音：优先真片自带 BGM，无音轨则用自制 BGM。"""
+    """该段背景音：优先真片自带 BGM，并统一到 -18 LUFS。
+
+    不同平台原片响度差异很大，直接拼接会一段响一段轻。先逐段标准化，再进入
+    sidechain 混音，人声与原片声的相对关系才稳定。
+    """
     dst = tmp / f"bed_{i:02d}.wav"
     dst.unlink(missing_ok=True)   # 清残留，避免上一轮的自制 bed 被误判为真片音轨
     if entry.get("bg"):
         subprocess.run([ff, "-y", "-loglevel", "error", "-t", f"{dur:.3f}",
-                        "-i", str(entry["bg"]), "-vn", "-ar", "44100", "-ac", "2",
+                        "-i", str(entry["bg"]), "-vn",
+                        "-af", "loudnorm=I=-18:TP=-1.5:LRA=11",
+                        "-ar", "44100", "-ac", "2",
                         "-sample_fmt", "s16", str(dst)], capture_output=True)
         if dst.exists() and dst.stat().st_size > 2000:
             return dst, 1.0
     subprocess.run([ff, "-y", "-loglevel", "error", "-stream_loop", "-1",
-                    "-t", f"{dur:.3f}", "-i", str(bgm), "-ar", "44100", "-ac", "2",
+                    "-t", f"{dur:.3f}", "-i", str(bgm),
+                    "-af", "loudnorm=I=-18:TP=-1.5:LRA=11",
+                    "-ar", "44100", "-ac", "2",
                     "-sample_fmt", "s16", str(dst)], check=True)
-    return dst, 0.55
+    return dst, 1.0
 
 
 def concat_bed(slices, out):
@@ -617,6 +637,19 @@ def concat_bed(slices, out):
         w.setsampwidth(2)
         w.setframerate(44100)
         w.writeframes(b"".join(chunks))
+
+
+def measure_lufs(path, ff):
+    """返回音频 integrated LUFS；测不到时返回 None。"""
+    try:
+        r = subprocess.run(
+            [ff, "-hide_banner", "-nostats", "-i", str(path),
+             "-filter_complex", "ebur128=peak=true", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=180)
+    except Exception:
+        return None
+    matches = re.findall(r"I:\s*(-?[\d.]+) LUFS", r.stderr or "")
+    return float(matches[-1]) if matches else None
 
 
 def edge_tts_synth(text, out_wav, ff, voice=VOICE, rate=RATE):
@@ -772,6 +805,7 @@ def main() -> int:
         if seg["type"] == "intro":
             seg["scrim_alpha"] = max(
                 60, min(190, int(render_settings.get("intro_scrim_alpha", 150))))
+            seg["compact"] = bool(render_settings.get("compact_intro"))
             if render_settings.get("compact_intro"):
                 m = re.match(r"\d{4}-W(\d{1,2})(?:-([A-Z]))?", args.week)
                 week_no = int(m.group(1)) if m else ""
@@ -883,19 +917,28 @@ def main() -> int:
     if audio_ok:
         concat_wavs(wavs, tts_dir / "voice.wav",
                     target_durs=[e["adur"] for e in timeline])
+    voice_segment_lufs = [
+        value for value in (measure_lufs(wav, ff) for wav in wavs)
+        if value is not None]
+    voice_active_lufs = (
+        float(sum(voice_segment_lufs) / len(voice_segment_lufs))
+        if voice_segment_lufs else None)
 
     # 背景：有真片就归一化成竖屏，没有则占位
     # 片头没有自己的素材, 但纯静态封面前 3 秒留不住人 (评估器一直报 hook_strength 低)。
     # 拿 TOP1 的片子当片头背景, 开场就有舞蹈画面, 同时也预告了本期第一名。
     top1_clip = None
+    top1_creator = ""
     for e in timeline:
         if e["seg"]["type"] == "top" and e["seg"].get("rank") == 1:
             top1_clip = find_clip(args.week, e["seg"].get("cid"))
+            top1_creator = e["seg"].get("creator", "")
             break
     for i, e in enumerate(timeline):
         clip = find_clip(args.week, e["seg"].get("cid"))
         if clip is None and e["seg"]["type"] == "intro" and top1_clip is not None:
             clip = top1_clip
+            e["seg"]["creator"] = top1_creator
         if clip:
             dst = tmp_dir / f"bg_{i:02d}.mp4"
             want = e["adur"] + GAP
@@ -928,6 +971,7 @@ def main() -> int:
     real_n = sum(1 for _, g in bed_slices if g >= 1.0)
     bed_path = tmp_dir / "bed.wav"
     concat_bed(bed_slices, bed_path)
+    bed_lufs = measure_lufs(bed_path, ff)
 
     out_dir = REPO / "output"
     silent = out_dir / f"{args.week}_demo_silent.mp4"
@@ -970,16 +1014,25 @@ def main() -> int:
     writer.close()
 
     if audio_ok:
+        # 目标关系: 归一化后的原片声约 -18 LUFS, 混入前乘 0.72 (-2.85dB);
+        # TTS 每段实测约 -22 LUFS, 乘 1.15 (+1.21dB)。两者基础听感接近,
+        # 讲话时只做温和 3:1 ducking，最后整片归一到 -16 LUFS。
+        voice_gain = 1.15
+        bed_gain = 0.72
         subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(silent),
                         "-i", str(tts_dir / "voice.wav"), "-i", str(bed_path),
                         "-filter_complex",
                         "[1:a]aformat=sample_rates=44100:channel_layouts=stereo,"
-                        "volume=1.55,asplit=2[vo][sc];"
-                        "[2:a]aformat=sample_rates=44100:channel_layouts=stereo,volume=0.32[bg];"
-                        "[bg][sc]sidechaincompress=threshold=0.008:ratio=15:"
-                        "attack=10:release=350[ducked];"
+                        f"volume={voice_gain},asplit=2[vo][sc];"
+                        "[2:a]aformat=sample_rates=44100:channel_layouts=stereo,"
+                        f"volume={bed_gain}[bg];"
+                        "[bg][sc]sidechaincompress=threshold=0.025:ratio=3:"
+                        "attack=15:release=250[ducked];"
                         "[vo][ducked]amix=inputs=2:duration=longest:normalize=0,"
-                        "alimiter=limit=0.95[a]",
+                        # 给 AAC 编码留足峰值余量；只在 PCM 上设 -1.5dBTP，
+                        # 编码后可能 overshoot 到 -0.1dBFS。
+                        "loudnorm=I=-16:TP=-2.5:LRA=9,"
+                        "alimiter=limit=0.75[a]",
                         "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac",
                         "-b:a", "192k", "-shortest", str(final)], check=True)
     else:
@@ -998,6 +1051,21 @@ def main() -> int:
         "fps": FPS,
         "size": [W, H],
         "voice_engine": engine,
+        "audio_mix": {
+            "voice_active_lufs": (
+                round(voice_active_lufs, 2) if voice_active_lufs is not None else None),
+            "bed_lufs": round(bed_lufs, 2) if bed_lufs is not None else None,
+            "voice_gain": 1.15 if audio_ok else 0,
+            "bed_gain": 0.72,
+            "pre_duck_delta_db": (
+                round(
+                    voice_active_lufs + 20 * math.log10(1.15)
+                    - (bed_lufs + 20 * math.log10(0.72)), 2)
+                if voice_active_lufs is not None and bed_lufs is not None else None),
+            "ducking_ratio": 3 if audio_ok else 0,
+            "final_target_lufs": -16,
+            "final_target_true_peak_dbfs": -1.5,
+        },
         "real_clip_segments": n_real,
         "segments": [],
     }

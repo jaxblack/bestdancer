@@ -1,14 +1,14 @@
 # 抖音创作者中心 · 自动上传（CDP 驱动）
 
 把渲染好的成片自动传到 `creator.douyin.com/creator-micro/content/upload`，
-填标题/简介/话题；不代替用户点"发布"（本项目约定用户自己确认发布）。
+填标题/简介/话题；只有 evaluation 已通过且显式加 `--publish` 才自动点击发布。
 
 前置：本地已启动 debug Chrome (`--remote-debugging-port=9222`) 并已登录
 抖音创作者中心。详见 `local-chrome-cdp` skill。
 
 ---
 
-## 头号坑：Playwright 50MB 传输上限
+## 头号坑：大文件上传
 
 `Locator.set_input_files` / `FileChooser.set_files` 都会抛：
 
@@ -16,8 +16,12 @@
 Cannot transfer files larger than 50Mb to a browser not co-located with the server
 ```
 
-成片一般 80-100MB，两条 Playwright 路径全废。**解法：走原始 CDP
-`DOM.setFileInputFiles`**，让 Chrome 直接读本地路径，没有中转就没有大小限制：
+成片一般 70-100MB。旧方案走原始 CDP `DOM.setFileInputFiles` 绕过 50MB 上限，
+但 Chrome 152 实测连续两次在 77MB 注入后 `Target crashed`。
+
+当前标准方案：**发布前自动压到 48MiB 以下，再走 Playwright 原生
+`set_input_files`**。压缩只降低视频码率，音频直接 copy，时长和内容不变；
+实测 77.2MB → 32.9MB 后一次发布成功。
 
 ```python
 from playwright.sync_api import sync_playwright
@@ -90,8 +94,13 @@ with sync_playwright() as p:
 5. **verify**：截图 + vision，标题显示 `N/30`、简介有内容、话题 chip 出现、
    读进度百分比和剩余时间。
 
-6. **不要代替用户点"发布"**。本项目约定："很好，可以了，我自己发布"。上传
-   5-15 分钟（~100-300 KB/s），填完就交给用户。
+6. **发布闸门**：`upload_to_douyin.py` 读取对应 `report.json` / `report_vN.json`，
+   必须 `passed=true` 且 LLM `verdict=pass`，否则拒绝上传。
+7. 带 `--publish` 时等待按钮 enabled，点击发布并确认跳转到内容管理页；写
+   `output/publish/<week>.json` 回执。后台显示“审核中”时状态记为
+   `submitted_reviewing`，不能误写成已经公开的 `published`。没有 `--publish`
+   则只上传填表，留给人工检查。
+8. 已有成功回执时拒绝重复发布；确需重发必须显式 `--force`。
 
 7. **收尾杀掉后台 poll 进程**。如果你为了等上传完成开了 background 循环，
    用户说自己发布时立刻 `process(action='kill')`——它占着 CDP 会话，还会
@@ -103,7 +112,8 @@ with sync_playwright() as p:
 
 | 症状 | 根因 | 修 |
 |---|---|---|
-| `Cannot transfer files larger than 50Mb` | Playwright 桥限制 | CDP `DOM.setFileInputFiles` |
+| `Cannot transfer files larger than 50Mb` | Playwright 桥限制 | 脚本自动生成 <48MiB 的 `_publish.mp4` |
+| `Target crashed`（推入大文件后） | Chrome 152 的大文件 CDP 注入不稳定 | 不再走大文件 CDP；压缩后原生上传 |
 | `.fill()` 简介后内容空 | 简介是 contenteditable 不是 textarea | `click()` + `keyboard.type()` |
 | 标题末尾被吞 | 超过 30 字硬上限 | 提前 `title[:30]` |
 | 上传"卡住" | 88MB @ 100KB/s 需 15 分钟很正常 | 别当挂了 |
@@ -136,4 +146,16 @@ with sync_playwright() as p:
 
 ## 参考脚本
 
-见 `scripts/upload_to_douyin.py`（把上述流程封装为 CLI，参数 `--week 2026-W30-B`）。
+见 `scripts/upload_to_douyin.py`：
+
+```bash
+# 只上传填表
+python3 scripts/upload_to_douyin.py --week 2026-W31-C
+
+# evaluation 通过后自动发布
+python3 scripts/upload_to_douyin.py --week 2026-W31-C --publish
+
+# 发布指定的通过版本
+python3 scripts/upload_to_douyin.py --week 2026-W31-C \
+  --mp4 output/2026-W31-C_demo_v7.mp4 --publish
+```

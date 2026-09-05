@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -46,6 +47,14 @@ MIN_LUFS, MAX_LUFS = -26.0, -9.0
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def ffprobe_json(video: Path) -> dict:
@@ -161,9 +170,47 @@ def check_loudness(video: Path) -> tuple[dict, list[dict]]:
             issues.append(issue("minor", "响度",
                                 f"整体响度 {facts['integrated_lufs']:.1f} LUFS 偏炸 (>{MAX_LUFS})",
                                 "降低 amix 后的 alimiter limit"))
-    if facts["true_peak_dbfs"] is not None and facts["true_peak_dbfs"] > -0.3:
-        issues.append(issue("minor", "响度", f"峰值 {facts['true_peak_dbfs']:.2f} dBFS 接近削波",
-                            "alimiter limit 调到 0.9"))
+    if facts["true_peak_dbfs"] is not None and facts["true_peak_dbfs"] > -1.5:
+        issues.append(issue(
+            "major", "响度",
+            f"编码后峰值 {facts['true_peak_dbfs']:.2f} dBFS 超过 -1.5dBFS 上限",
+            "loudnorm 预留更大 true-peak 余量，并在 AAC 编码前增加 limiter"))
+    return facts, issues
+
+
+def check_audio_balance(manifest: dict) -> tuple[dict, list[dict]]:
+    """检查人声与原片声的相对响度，而不是只看最终整片 LUFS。"""
+    mix = manifest.get("audio_mix") or {}
+    issues: list[dict] = []
+    delta = mix.get("pre_duck_delta_db")
+    ratio = mix.get("ducking_ratio")
+    facts = {
+        "voice_active_lufs": mix.get("voice_active_lufs"),
+        "bed_lufs": mix.get("bed_lufs"),
+        "voice_bed_delta_db": delta,
+        "ducking_ratio": ratio,
+        "final_target_lufs": mix.get("final_target_lufs"),
+    }
+    if delta is None:
+        issues.append(issue(
+            "major", "音频平衡",
+            "manifest 没有记录人声/原片声的相对响度，无法验证听感平衡",
+            "用当前版本 render_demo.py 重渲，写入 audio_mix 指标"))
+    elif delta > 5:
+        issues.append(issue(
+            "major", "音频平衡",
+            f"人声比原片声高 {delta:.1f}dB，听感会压住舞蹈原声",
+            "降低 voice_gain、提高 bed_gain，并把 sidechain ratio 控制在 3:1 左右"))
+    elif delta < -3:
+        issues.append(issue(
+            "major", "音频平衡",
+            f"人声比原片声低 {-delta:.1f}dB，口播可能被音乐淹没",
+            "提高 voice_gain 或降低 bed_gain"))
+    if ratio is not None and ratio > 6:
+        issues.append(issue(
+            "major", "音频平衡",
+            f"sidechain ducking={ratio}:1 过强，讲话时原片声会突然塌下去",
+            "使用 2.5:1–4:1 的温和 ducking"))
     return facts, issues
 
 
@@ -537,9 +584,11 @@ def main() -> int:
     av_facts, av_issues = check_black_freeze_silence(
         video, has_audio=spec_facts.get("audio_codec") is not None)
     loud_facts, loud_issues = check_loudness(video)
+    balance_facts, balance_issues = check_audio_balance(manifest)
     cfg_facts, cfg_issues = check_config(week, manifest)
-    issues += av_issues + loud_issues + cfg_issues
-    tech_facts = {**spec_facts, **loud_facts, **cfg_facts, **av_facts}
+    issues += av_issues + loud_issues + balance_issues + cfg_issues
+    tech_facts = {
+        **spec_facts, **loud_facts, **balance_facts, **cfg_facts, **av_facts}
 
     if not args.quiet:
         print(f"[eval] 硬指标: {spec_facts['duration_sec']}s "
@@ -628,6 +677,7 @@ def main() -> int:
     report = {
         "week": week,
         "video": video.relative_to(REPO).as_posix(),
+        "video_sha256": file_sha256(video),
         "threshold": args.threshold,
         "final_score": final,
         "passed": passed,
