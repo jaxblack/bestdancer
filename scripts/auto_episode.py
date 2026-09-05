@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import datetime as dt
 import importlib.util
 import json
 import os
@@ -121,9 +122,37 @@ def preflight() -> list[str]:
 
 # ────────────────────────── 1. 选期号 ──────────────────────────
 
-def resolve_target(week: str | None, edition: str | None) -> tuple[str, str]:
+def calendar_target() -> tuple[str, str]:
+    """每日任务按当前 ISO 周开期；失败重跑同一期，已提交才进入下一字母。"""
+    week = daily.iso_week()
+    entries = sorted(WEEKLY.glob(f"{week}-?.json"))
+    if not entries:
+        return week, "A"
+    latest = entries[-1]
+    letter = latest.stem.rsplit("-", 1)[-1]
+    receipt = REPO / "output" / "publish" / f"{latest.stem}.json"
+    status = ""
+    if receipt.exists():
+        try:
+            status = json.loads(receipt.read_text()).get("status", "")
+        except json.JSONDecodeError:
+            pass
+    if status in {"submitted", "submitted_reviewing", "published"}:
+        if letter < "Z":
+            return week, chr(ord(letter) + 1)
+        next_week = dt.date.fromisocalendar(
+            int(week[:4]), int(week[-2:]), 1) + dt.timedelta(days=7)
+        y, w, _ = next_week.isocalendar()
+        return f"{y}-W{w:02d}", "A"
+    return week, letter
+
+
+def resolve_target(week: str | None, edition: str | None,
+                   use_calendar: bool = False) -> tuple[str, str]:
     if week and edition:
         return week, edition
+    if use_calendar and not week and not edition:
+        return calendar_target()
     # daily.next_target() 是"最新已存在的期号 +1"。但本脚本一开始就会把候选池写进
     # config/weekly/<target>.json, 所以中途失败后重跑会被当成"这期已存在"而跳到下一封号,
     # 留下一个半成品。这里先看最新一期有没有出片, 没出就接着做它。
@@ -303,14 +332,28 @@ def daily_days_since(s: str | None) -> int | None:
 
 # ────────────────────────── 3. 各步骤 ──────────────────────────
 
-def step_discover(target: str, timeout_per_run: int) -> int:
+def step_discover(target: str, timeout_per_run: int,
+                  recent_days: int | None = None,
+                  strict_recent: bool = False) -> int:
     watchdog = start_mute_watchdog()
     try:
-        return sh([PY, "-u", "scripts/discover_loop.py", "--week", target,
-                   "--per-run-timeout", str(timeout_per_run)])
+        cmd = [PY, "-u", "scripts/discover_loop.py", "--week", target,
+               "--per-run-timeout", str(timeout_per_run)]
+        if recent_days is not None:
+            cmd += ["--recent-days", str(recent_days)]
+        if strict_recent:
+            cmd.append("--strict-recent")
+        return sh(cmd)
     finally:
         if watchdog:
             watchdog.terminate()
+
+
+def step_discovery_evaluate(target: str, recent_days: int | None) -> int:
+    cmd = [PY, "-u", "pipeline/evaluate_discovery.py", target, "--compare"]
+    if recent_days is not None:
+        cmd += ["--recent-days", str(recent_days)]
+    return sh(cmd)
 
 
 def step_download(target: str) -> int:
@@ -688,7 +731,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="一条命令出一期本周热舞")
     ap.add_argument("--week", default=None, help="如 2026-W31; 不给就接着最新一期往后排")
     ap.add_argument("--edition", default=None, help="如 C")
+    ap.add_argument("--calendar-target", action="store_true",
+                    help="按当前 ISO 周开期；失败重跑同一期，已有发布回执才进入下一期")
     ap.add_argument("--skip-discover", action="store_true")
+    ap.add_argument("--recent-days", type=int, default=None,
+                    help="发现时间窗口；每日任务使用 1")
+    ap.add_argument("--strict-recent", action="store_true",
+                    help="严格丢弃无日期或超过 recent-days 的候选")
     ap.add_argument("--skip-download", action="store_true")
     ap.add_argument("--skip-verify", action="store_true",
                     help="跳过素材画面核对 (舞种/作者是否对得上)")
@@ -715,7 +764,10 @@ def main() -> int:
     for p in problems:
         log(f"前置警告: {p}")
 
-    week, edition = resolve_target(args.week, args.edition)
+    if args.strict_recent and (args.recent_days is None or args.recent_days < 1):
+        ap.error("--strict-recent 必须同时提供 --recent-days >= 1")
+    week, edition = resolve_target(
+        args.week, args.edition, use_calendar=args.calendar_target)
     target = f"{week}-{edition}"
     log(f"目标期号 = {target}")
     archive_existing_current(target)
@@ -724,7 +776,13 @@ def main() -> int:
         if not ensure_cdp():
             log("没有 CDP 就抓不了素材; 想用现成候选池请加 --skip-discover")
             return 2
-        step_discover(target, args.discover_timeout)
+        if step_discover(
+                target, args.discover_timeout,
+                recent_days=args.recent_days,
+                strict_recent=args.strict_recent) != 0:
+            log("发现步骤失败，拒绝继续使用不完整候选池")
+            return 2
+        step_discovery_evaluate(target, args.recent_days)
 
     if args.reuse_config:
         pool_path = WEEKLY / f"{target}.json"

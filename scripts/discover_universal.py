@@ -36,6 +36,8 @@ parser.add_argument("--pool-size", type=int, default=100, help="max candidates p
 parser.add_argument("--per-keyword", type=int, default=25, help="max cards to consider per keyword before dedupe")
 parser.add_argument("--recent-days", type=int, default=None,
                     help="prefer this many days; defaults to admin/settings.json:recent_days")
+parser.add_argument("--strict-recent", action="store_true",
+                    help="严格丢弃无日期或超过 recent-days 的候选；每日任务必须开启")
 parser.add_argument("--download-per-platform", type=int, default=8, help="how many top videos to actually download per platform")
 parser.add_argument("--append", action="store_true", help="append to existing candidates/<platform>.json instead of overwriting")
 args = parser.parse_args()
@@ -753,7 +755,15 @@ def save_platform_pool(platform: str, items: list[dict]) -> int:
     for c in items:
         if c["id"] not in seen or (c.get("like") or 0) > (seen[c["id"]].get("like") or 0):
             seen[c["id"]] = c
-    uniq = sorted(seen.values(), key=rank_key, reverse=True)[:args.pool_size]
+    eligible = list(seen.values())
+    if args.strict_recent:
+        eligible = [
+            c for c in eligible
+            if c.get("published_at") is not None
+            and days_since(c.get("published_at")) is not None
+            and days_since(c.get("published_at")) <= args.recent_days
+        ]
+    uniq = sorted(eligible, key=rank_key, reverse=True)[:args.pool_size]
     (CAND_DIR / f"{platform}.json").write_text(
         json.dumps(uniq, ensure_ascii=False, indent=2), encoding="utf-8")
     recent = sum(1 for c in uniq if (days_since(c.get("published_at")) or 999) <= args.recent_days)

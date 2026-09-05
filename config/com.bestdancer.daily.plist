@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bestdancer.daily</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/jax/bestdancer/scripts/run_daily_5am.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/jax/bestdancer</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>5</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>LowPriorityIO</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/jax/bestdancer/output/logs/launchd.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/jax/bestdancer/output/logs/launchd.stderr.log</string>
+</dict>
+</plist>

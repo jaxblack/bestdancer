@@ -17,6 +17,8 @@ parser.add_argument("--keywords", default=None,
 parser.add_argument("--pool-size", type=int, default=100)
 parser.add_argument("--per-keyword", type=int, default=25)
 parser.add_argument("--per-run-timeout", type=int, default=120)
+parser.add_argument("--recent-days", type=int, default=None)
+parser.add_argument("--strict-recent", action="store_true")
 args = parser.parse_args()
 
 settings = json.loads((REPO / "admin" / "settings.json").read_text())
@@ -61,6 +63,10 @@ for p in platforms:
                "--week", args.week, "--platforms", p, "--keywords", kw,
                "--pool-size", str(args.pool_size),
                "--per-keyword", str(args.per_keyword), "--append"]
+        if args.recent_days is not None:
+            cmd += ["--recent-days", str(args.recent_days)]
+        if args.strict_recent:
+            cmd.append("--strict-recent")
         try:
             r = subprocess.run(cmd, cwd=str(REPO),
                                capture_output=True, text=True,
@@ -84,7 +90,8 @@ for p in platforms:
         d = json.loads(fp.read_text())
     except Exception:
         print(f"  {p}: (parse error)", flush=True); continue
+    window = args.recent_days if args.recent_days is not None else 7
     recent = sum(1 for c in d if c.get("published_at") and
-                 (today - dt.date.fromisoformat(c["published_at"])).days <= 7)
+                 (today - dt.date.fromisoformat(c["published_at"])).days <= window)
     top_like = max((c.get("like", 0) for c in d), default=0)
-    print(f"  {p}: {len(d)} total, {recent} within 7d, top ❤{top_like}", flush=True)
+    print(f"  {p}: {len(d)} total, {recent} within {window}d, top ❤{top_like}", flush=True)
