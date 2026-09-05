@@ -7,6 +7,31 @@ source .venv/bin/activate
 python3 scripts/auto_episode.py --publish
 ```
 
+## 每日 05:00 定时任务
+
+```bash
+./scripts/install_daily_launchd.sh
+```
+
+- 使用 macOS `launchd` 的 `com.bestdancer.daily`，每天本地时间 05:00 启动。
+- 严格只保留最近 1 天、有可解析发布日期的候选，再按热度排序。
+- 当前日历周按 A/B/C… 每天一期；失败时第二天重试同一期，已有提交回执才进入下一期。
+- 任务使用 `caffeinate` 防止长流程因睡眠中断，并用 PID 锁防止重入。
+- 日志：`output/logs/daily_YYYY-MM-DD.log`。
+
+### Copilot Key
+
+每日 evaluation 使用 GitHub Copilot CLI 非交互模式。认证变量为官方支持的
+`COPILOT_GITHUB_TOKEN`，但明文**不写入仓库、shell 脚本或 plist**：
+
+1. `install_daily_launchd.sh` 首次安装时把现有 GitHub/Copilot token 写入 macOS
+   Keychain，service 名为 `bestdancer-copilot-github-token`。
+2. 每日脚本只检查 Keychain 项存在；真正调用 Copilot 时才读取，并只注入
+   `copilot` 子进程。ffmpeg、yt-dlp、浏览器和其他流水线进程都拿不到 token。
+3. 设置 `BESTDANCER_AI_PROVIDER=copilot`，素材核对、逐段 evaluation 和成片
+   evaluation 都通过 `copilot -p --attachment ...` 执行。
+4. Keychain 中没有 token 时任务 fail-closed，不回退到别的模型或无评估发布。
+
 它依次执行：
 
 1. **CDP/登录态预检**
@@ -58,6 +83,10 @@ python3 scripts/auto_episode.py --publish
 
 - `output/<week>_demo.mp4`：当前最新版。
 - `output/<week>_demo_vN.mp4`：不可变历史版本。
+- 每日任务同时输出
+  `output/daily/YYYY-MM-DD/YYYY-MM-DD_Www-X.mp4` 和
+  `YYYY-MM-DD_Www-X_vN.mp4`。日期名供运营使用，附加内部 week-edition 防止同日
+  人工重跑另一目标时覆盖文件。
 - `output/eval/<week>/report_vN.json`：该版本对应评估。
 - 若新版本退步，从得分最高且问题最少的版本 config 分叉，不在差版本上继续叠改。
 - 用户明确要求兜底时，只能发布历史上 `passed=true`、`verdict=pass` 的版本。

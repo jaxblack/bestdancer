@@ -21,6 +21,18 @@ export HOME="/Users/jax"
 export PYTHONUNBUFFERED=1
 export NO_PROXY="localhost,127.0.0.1,::1"
 export no_proxy="$NO_PROXY"
+export BESTDANCER_AI_PROVIDER="copilot"
+export BESTDANCER_COPILOT_KEYCHAIN_SERVICE="bestdancer-copilot-github-token"
+
+# 不在仓库/plist 写明文 key。Copilot CLI 官方读取 COPILOT_GITHUB_TOKEN；
+# 安装脚本把它放进 macOS Keychain。这里只检查存在性；真正调用 Copilot 时
+# codex_client 才读取并只传给 copilot 子进程，ffmpeg/yt-dlp/浏览器不会继承。
+if ! security find-generic-password \
+    -a jax -s "$BESTDANCER_COPILOT_KEYCHAIN_SERVICE" >/dev/null 2>&1; then
+  echo "ERROR: Keychain 缺 bestdancer-copilot-github-token"
+  echo "运行 scripts/install_daily_launchd.sh 重新安装"
+  exit 2
+fi
 
 # 本机跨平台访问依赖本地代理；代理没启动时不设置，避免所有请求立即失败。
 if /usr/bin/nc -z 127.0.0.1 1087 >/dev/null 2>&1; then
@@ -60,6 +72,7 @@ trap cleanup EXIT INT TERM
 cd "$REPO"
 
 if [ "${1:-}" = "--dry-run" ]; then
+  copilot --version
   "$PYTHON" -m py_compile \
     scripts/auto_episode.py \
     scripts/discover_loop.py \
@@ -83,6 +96,7 @@ fi
 # caffeinate 保证长时间的发现/下载/渲染不会因空闲睡眠中断。
 /usr/bin/caffeinate -i "$PYTHON" -u scripts/auto_episode.py \
   --calendar-target \
+  --daily-filename \
   --recent-days 1 \
   --strict-recent \
   --discover-timeout 420 \

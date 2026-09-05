@@ -32,6 +32,16 @@ python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发
 完整的发现、evaluation、版本化修改、音频目标和发布回执约定见
 [BestDancer 标准化出片与发布流程](docs/skills/standard-episode-workflow.md)。
 
+每日 05:00 自动任务安装/更新：
+
+```bash
+./scripts/install_daily_launchd.sh
+```
+
+定时任务严格抓最近 1 天，使用 macOS Keychain 中的 `COPILOT_GITHUB_TOKEN`
+运行 Copilot evaluation，通过后自动发布。每日运营文件按日期写入
+`output/daily/YYYY-MM-DD/YYYY-MM-DD_Www-X[_vN].mp4`。
+
 `--max-attempts` 控制真正的版本化闭环（默认 5 轮）：
 
 1. 渲染；

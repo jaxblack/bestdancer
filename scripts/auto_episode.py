@@ -33,6 +33,7 @@ REPO = Path(__file__).resolve().parents[1]
 WEEKLY = REPO / "config" / "weekly"
 INCOMING = REPO / "assets" / "incoming"
 PY = sys.executable
+DAILY_ARTIFACT_DATE: str | None = None
 
 CDP_URL = "http://127.0.0.1:9222/json/version"
 CHROME_APP = "Google Chrome"
@@ -494,6 +495,23 @@ def archive_iteration(target: str, version: int, report: dict | None = None,
     if video.exists():
         shutil.copy2(video, versioned)
 
+    # 每日任务对外使用日期命名；内部仍保留 week-edition 作为配置主键，
+    # 避免破坏历史去重和现有 evaluation 关联。
+    if DAILY_ARTIFACT_DATE and versioned.exists():
+        daily_dir = out / "daily" / DAILY_ARTIFACT_DATE
+        daily_dir.mkdir(parents=True, exist_ok=True)
+        # 同一天可能人工重跑另一 target；文件名带内部 week-edition，不能互相覆盖。
+        target_suffix = target.removeprefix(f"{DAILY_ARTIFACT_DATE[:4]}-")
+        daily_stem = f"{DAILY_ARTIFACT_DATE}_{target_suffix}"
+        daily_version = daily_dir / f"{daily_stem}_v{version}.mp4"
+        daily_latest = daily_dir / f"{daily_stem}.mp4"
+        for dest in (daily_version, daily_latest):
+            dest.unlink(missing_ok=True)
+            try:
+                os.link(versioned, dest)
+            except OSError:
+                shutil.copy2(versioned, dest)
+
     manifest = out / f"{target}_manifest.json"
     if include_manifest and manifest.exists():
         archived_manifest = json.loads(manifest.read_text())
@@ -733,6 +751,8 @@ def main() -> int:
     ap.add_argument("--edition", default=None, help="如 C")
     ap.add_argument("--calendar-target", action="store_true",
                     help="按当前 ISO 周开期；失败重跑同一期，已有发布回执才进入下一期")
+    ap.add_argument("--daily-filename", action="store_true",
+                    help="同时输出 output/daily/YYYY-MM-DD/YYYY-MM-DD[_vN].mp4")
     ap.add_argument("--skip-discover", action="store_true")
     ap.add_argument("--recent-days", type=int, default=None,
                     help="发现时间窗口；每日任务使用 1")
@@ -759,6 +779,9 @@ def main() -> int:
     ap.add_argument("--model", default=None, help="评估用的 codex 模型")
     ap.add_argument("--publish", action="store_true", help="及格后调用抖音上传脚本")
     args = ap.parse_args()
+    global DAILY_ARTIFACT_DATE
+    if args.daily_filename or args.calendar_target:
+        DAILY_ARTIFACT_DATE = dt.date.today().isoformat()
 
     problems = preflight()
     for p in problems:
