@@ -763,7 +763,7 @@ def main() -> int:
                     help="跳过素材画面核对 (舞种/作者是否对得上)")
     ap.add_argument("--skip-segments", action="store_true",
                     help="跳过逐段验收 (舞种/标题/难度/表现力)")
-    ap.add_argument("--segment-rounds", type=int, default=2,
+    ap.add_argument("--segment-rounds", type=int, default=5,
                     help="逐段验收最多换几轮替补")
     ap.add_argument("--skip-render", action="store_true")
     ap.add_argument("--reuse-config", action="store_true",

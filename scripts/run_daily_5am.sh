@@ -100,6 +100,7 @@ fi
   --recent-days 1 \
   --strict-recent \
   --discover-timeout 420 \
+  --segment-rounds 5 \
   --max-attempts 5 \
   --publish
 
