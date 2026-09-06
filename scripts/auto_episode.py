@@ -357,13 +357,14 @@ def step_discovery_evaluate(target: str, recent_days: int | None) -> int:
     return sh(cmd)
 
 
-def step_download(target: str) -> int:
+def step_download(target: str, max_per_platform: int = 12) -> int:
     """抖音走 CDP 拦截 playAddr; 其余平台走 yt-dlp。有一个成功就算这步没白跑。"""
     watchdog = start_mute_watchdog()
     try:
         rc_douyin = sh([PY, "-u", "scripts/douyin_download_picks.py", "--week", target])
         rc_other = sh([PY, "-u", "scripts/download_cross_platform.py", "--week", target,
-                       "--platforms", "tiktok|instagram|youtube", "--max-per-platform", "6"])
+                       "--platforms", "tiktok|instagram|youtube",
+                       "--max-per-platform", str(max_per_platform)])
         return 0 if (rc_douyin == 0 or rc_other == 0) else 1
     finally:
         if watchdog:
@@ -873,8 +874,19 @@ def main() -> int:
                 try:
                     cfg_path, warnings = step_build(week, edition, WEEKLY / f"{target}.json")
                 except SystemExit as e:
-                    log(f"替补不足, 无法重新组稿: {e}")
-                    break
+                    if args.skip_download:
+                        log(f"替补不足且已指定 --skip-download: {e}")
+                        break
+                    log(f"替补不足，补下载后备素材再试: {e}")
+                    if step_download(target, max_per_platform=18) != 0:
+                        log("后备素材下载失败")
+                        break
+                    try:
+                        cfg_path, warnings = step_build(
+                            week, edition, WEEKLY / f"{target}.json")
+                    except SystemExit as retry_error:
+                        log(f"补下载后仍无足够替补: {retry_error}")
+                        break
                 for w in warnings:
                     log(f"警告: {w}")
             if not segments_ready:
