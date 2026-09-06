@@ -100,6 +100,16 @@ def _validate_schema(value, schema: dict, path: str = "$") -> list[str]:
     return errors
 
 
+def _strip_json_controls(raw: str) -> str:
+    """移除 Copilot 终端换行。
+
+    Copilot CLI 会在任意列宽处插入 CR/LF/tab，甚至把 JSON key 和数字折成
+    `"visible_han\ndle"` / `9\n4`。只修字符串内部不够；JSON 本身不需要这些
+    控制空白，统一删除后才能稳定 parse + schema validate。
+    """
+    return raw.replace("\r", "").replace("\n", "").replace("\t", "")
+
+
 def run_codex_json(prompt: str, schema: dict, work_dir: Path,
                    images: list[Path] | None = None,
                    model: str | None = None, timeout: int = 900,
@@ -127,6 +137,7 @@ def run_codex_json(prompt: str, schema: dict, work_dir: Path,
         full_prompt = (
             prompt
             + "\n\n必须只输出一个 JSON 对象，不能带 Markdown 围栏或解释。"
+            + "所有字符串必须在同一行，字符串内部不得使用裸换行或制表符。"
             + "\nJSON Schema:\n"
             + json.dumps(schema, ensure_ascii=False))
         cmd = [codex_bin, "-p", full_prompt, "--silent", "--stream", "off",
@@ -173,7 +184,7 @@ def run_codex_json(prompt: str, schema: dict, work_dir: Path,
     if fenced:
         raw = fenced.group(1).strip()
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(_strip_json_controls(raw))
     except json.JSONDecodeError as e:
         return None, f"{provider} 结果不是合法 JSON: {e}; 原文前 400 字: {raw[:400]}"
     schema_errors = _validate_schema(parsed, schema)

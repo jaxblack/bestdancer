@@ -834,7 +834,9 @@ def main() -> int:
         step_download(target)
 
     if not args.skip_verify:
-        step_verify(target, args.no_llm, args.model)
+        if step_verify(target, args.no_llm, args.model) != 0:
+            log("素材画面核对未完整通过，拒绝继续组稿")
+            return 3
 
     attempt = 0
     passed = False
@@ -858,9 +860,15 @@ def main() -> int:
         # 逐段验收: 表现力/竖版适配太差的直接淘汰, 由后面的舞段顶替名次。
         # 放在渲染之前 —— 与其渲完再被整片评估打回, 不如先把烂素材换掉。
         if not args.skip_segments:
+            segments_ready = False
             for seg_round in range(args.segment_rounds):
-                if step_segments(target, args.model) == 0:
+                segment_rc = step_segments(target, args.model)
+                if segment_rc == 0:
+                    segments_ready = True
                     break
+                if segment_rc == 2:
+                    log("逐段 evaluation 未完整通过，拒绝渲染未评估舞段")
+                    return 4
                 log(f"有舞段被淘汰, 重新组稿让后面的顶上 (第 {seg_round + 1} 轮)")
                 try:
                     cfg_path, warnings = step_build(week, edition, WEEKLY / f"{target}.json")
@@ -869,6 +877,9 @@ def main() -> int:
                     break
                 for w in warnings:
                     log(f"警告: {w}")
+            if not segments_ready:
+                log("逐段 evaluation 换段轮数耗尽；新替补尚未验收，拒绝渲染")
+                return 4
 
         if args.skip_render:
             log("按要求跳过渲染")

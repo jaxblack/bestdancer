@@ -213,10 +213,12 @@ def main() -> int:
 
     print(f"[seg] 逐段评估 {len(jobs)} 段 (缓存 {sum(1 for j in jobs if j['key'] in cache)} 段)")
     results = []
+    failures = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         for j, res, err in ex.map(run_one, jobs):
             if res is None:
                 print(f"  ? {j['pick'].get('id')} 评估失败: {err[:90]}")
+                failures.append((j["pick"].get("id"), err))
                 continue
             cache[j["key"]] = res
             results.append((j, res))
@@ -290,6 +292,9 @@ def main() -> int:
                       for j, r in results]},
         ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[seg] 报告: {(work / 'report.json').relative_to(REPO)}")
+    if failures:
+        print(f"[seg] ERROR: {len(failures)} 个入选舞段评估失败，拒绝继续渲染")
+        return 2
     return 1 if drop_ids else 0
 
 

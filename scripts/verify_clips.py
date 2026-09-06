@@ -236,10 +236,12 @@ def main() -> int:
 
     # ── 2. 画面核对 ──
     verdicts: dict[str, dict] = {}
+    vision_failures: list[tuple[str, str]] = []
     if not args.no_vision:
         codex_bin = find_codex()
         if not codex_bin:
-            print("[verify] 找不到 codex, 跳过画面核对", file=sys.stderr)
+            print("[verify] 找不到 AI CLI，无法执行画面核对", file=sys.stderr)
+            return 2
         else:
             todo = []
             for vid, meta in dl2.items():
@@ -268,6 +270,7 @@ def main() -> int:
                                   f"conf={res['confidence']} — {res['scene'][:44]}", flush=True)
                         else:
                             print(f"  ? {vid} 核对失败: {err[:120]}", flush=True)
+                            vision_failures.append((vid, err))
                 cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2),
                                       encoding="utf-8")
 
@@ -329,6 +332,10 @@ def main() -> int:
         json.dumps(verdicts, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[verify] 判定已存 {(work_dir / 'verdicts.json').relative_to(REPO)} "
           f"({len(verdicts)} 支, 按视频 id 索引)")
+    if not args.no_vision and vision_failures:
+        print(f"[verify] ERROR: {len(vision_failures)} 支已下载素材核对失败，"
+              "拒绝让未核对素材进入组稿")
+        return 2
     return 0
 
 

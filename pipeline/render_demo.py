@@ -1032,7 +1032,9 @@ def main() -> int:
                         # 给 AAC 编码留足峰值余量；只在 PCM 上设 -1.5dBTP，
                         # 编码后可能 overshoot 到 -0.1dBFS。
                         "loudnorm=I=-16:TP=-2.5:LRA=9,"
-                        "alimiter=limit=0.75[a]",
+                        # alimiter 默认 level=true 会把限完的信号自动补回 0dB，
+                        # 必须显式关掉，否则编码后实测 peak=0.0dBFS。
+                        "alimiter=limit=0.75:level=false[a]",
                         "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac",
                         "-b:a", "192k", "-shortest", str(final)], check=True)
     else:
