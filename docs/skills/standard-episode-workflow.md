@@ -17,6 +17,10 @@ python3 scripts/auto_episode.py --publish
 - 严格只保留最近 1 天、有可解析发布日期的候选，再按热度排序。
 - 当前日历周按 A/B/C… 每天一期；失败时第二天重试同一期，已有提交回执才进入下一期。
 - 任务使用 `caffeinate` 防止长流程因睡眠中断，并用 PID 锁防止重入。
+- 实际生产开始前记录 macOS 当前输出音量和静音状态，随后**静音整个系统**；
+  抓取、下载、生成、evaluation 和发布期间均保持静音。任务成功、失败或收到终止信号时，
+  `trap` 都会恢复原音量及原静音状态。若无法静音则 fail-closed，不启动生产。
+- 调试 Chrome 本身仍使用 `--mute-audio`，作为系统静音之外的第二层保障。
 - 日志：`output/logs/daily_YYYY-MM-DD.log`。
 
 ### Copilot Key

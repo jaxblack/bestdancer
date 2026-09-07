@@ -6,6 +6,9 @@ REPO="/Users/jax/bestdancer"
 PYTHON="$REPO/.venv/bin/python"
 LOG_DIR="$REPO/output/logs"
 LOCK_DIR="$REPO/output/.daily-automation.lock"
+SOUND_MUTED_BY_JOB=false
+ORIGINAL_OUTPUT_VOLUME=""
+ORIGINAL_OUTPUT_MUTED=""
 
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/daily_$(date +%Y-%m-%d).log"
@@ -64,6 +67,17 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 echo "$$" >"$LOCK_DIR/pid"
 cleanup() {
+  if [ "$SOUND_MUTED_BY_JOB" = true ]; then
+    # 无论成功、失败、SIGINT/SIGTERM 都恢复任务开始前的音量和静音状态。
+    /usr/bin/osascript -e \
+      "set volume output volume $ORIGINAL_OUTPUT_VOLUME" >/dev/null 2>&1 || true
+    if [ "$ORIGINAL_OUTPUT_MUTED" = "true" ]; then
+      /usr/bin/osascript -e "set volume with output muted" >/dev/null 2>&1 || true
+    else
+      /usr/bin/osascript -e "set volume without output muted" >/dev/null 2>&1 || true
+    fi
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] 系统声音已恢复: volume=$ORIGINAL_OUTPUT_VOLUME muted=$ORIGINAL_OUTPUT_MUTED"
+  fi
   rm -f "$LOCK_DIR/pid"
   rmdir "$LOCK_DIR" 2>/dev/null || true
 }
@@ -92,6 +106,19 @@ print(f"DRY RUN OK: next target={week}-{edition}, window=1 day, strict_recent=tr
 PY
   exit 0
 fi
+
+# 浏览器虽然也带 --mute-audio，但定时任务可能复用主浏览器页面；生成阶段还会调用
+# 多个音视频工具。实际生产开始前直接静音整个 macOS，结束时由 trap 原样恢复。
+ORIGINAL_OUTPUT_VOLUME="$(/usr/bin/osascript \
+  -e 'output volume of (get volume settings)')"
+ORIGINAL_OUTPUT_MUTED="$(/usr/bin/osascript \
+  -e 'output muted of (get volume settings)')"
+if ! /usr/bin/osascript -e "set volume with output muted" >/dev/null; then
+  echo "ERROR: 无法静音 macOS 系统声音，拒绝启动可能出声的自动任务"
+  exit 2
+fi
+SOUND_MUTED_BY_JOB=true
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 系统声音已静音（任务结束后恢复）"
 
 # caffeinate 保证长时间的发现/下载/渲染不会因空闲睡眠中断。
 /usr/bin/caffeinate -i "$PYTHON" -u scripts/auto_episode.py \
