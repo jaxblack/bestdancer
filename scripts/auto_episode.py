@@ -772,7 +772,8 @@ def main() -> int:
     ap.add_argument("--threshold", type=int, default=80, help="评估及格线")
     ap.add_argument("--max-attempts", type=int, default=5,
                     help="render→evaluation→修改 的最多迭代轮数 (默认 5)")
-    ap.add_argument("--max-candidates", type=int, default=60)
+    ap.add_argument("--max-candidates", type=int, default=100,
+                    help="进入周配置的候选容量；默认100，为多轮换段保留低热度后备")
     ap.add_argument("--provisional-picks", type=int, default=12,
                     help="先下这么多支, 再从真正下到的里面挑 TOP5")
     ap.add_argument("--discover-timeout", type=int, default=300)
