@@ -69,6 +69,8 @@ python3 scripts/auto_episode.py --publish
    - 上传脚本再次校验通过报告，闸门 fail-closed。
    - 成片超过 48MiB 时自动生成低码率 `_publish.mp4`，避免 Chrome 大文件注入崩溃。
    - 上传、填标题/简介、等待按钮可用、点击发布、确认跳转。
+   - 简介中的外站署名写成 `作者：用户名`，不能直接输入 `@用户名`，否则抖音
+     contenteditable 的账号联想可能自动替换成错误账号。
    - 回执写入 `output/publish/<week>.json`：平台审核中记为
      `submitted_reviewing`，审核通过并公开后才记为 `published`。
    - 已有提交/成功回执时拒绝重复发布。

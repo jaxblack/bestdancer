@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 CODEX_ENV = "BESTDANCER_CODEX_BIN"
@@ -146,12 +147,26 @@ def run_codex_json(prompt: str, schema: dict, work_dir: Path,
             cmd += ["--model", model]
         for img in (images or []):
             cmd += ["--attachment", str(img)]
-        try:
-            r = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout,
-                env=copilot_env)
-        except subprocess.TimeoutExpired:
-            return None, f"copilot 超时 (>{timeout}s)"
+        r = None
+        for attempt in range(3):
+            try:
+                r = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=timeout,
+                    env=copilot_env)
+            except subprocess.TimeoutExpired:
+                if attempt < 2:
+                    time.sleep(10 * (attempt + 1))
+                    continue
+                return None, f"copilot 超时 (>{timeout}s, 已重试3次)"
+            detail = ((r.stderr or "") + (r.stdout or "")).lower()
+            transient = any(text in detail for text in (
+                "model catalog request timed out", "failed to load models",
+                "rate limit", "too many requests", "http 429",
+                "http 502", "http 503", "connection reset"))
+            if r.returncode == 0 or not transient or attempt == 2:
+                break
+            time.sleep(10 * (attempt + 1))
+        assert r is not None
         if r.returncode != 0:
             detail = ((r.stderr or "") + (r.stdout or ""))[-800:]
             return None, f"copilot 没有产出结果 (rc={r.returncode}): {detail}"

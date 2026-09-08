@@ -1029,12 +1029,11 @@ def main() -> int:
                         "[bg][sc]sidechaincompress=threshold=0.025:ratio=3:"
                         "attack=15:release=250[ducked];"
                         "[vo][ducked]amix=inputs=2:duration=longest:normalize=0,"
-                        # 给 AAC 编码留足峰值余量；只在 PCM 上设 -1.5dBTP，
-                        # 编码后可能 overshoot 到 -0.1dBFS。
-                        "loudnorm=I=-16:TP=-2.5:LRA=9,"
-                        # alimiter 默认 level=true 会把限完的信号自动补回 0dB，
-                        # 必须显式关掉，否则编码后实测 peak=0.0dBFS。
-                        "alimiter=limit=0.75:level=false[a]",
+                        # AAC 编码实测可比 PCM 峰值高约 2dB。预留 -4dBTP，
+                        # 再用 -4.7dBFS limiter，保证编码后的成片仍低于 -1.5dBFS。
+                        "loudnorm=I=-16:TP=-4.0:LRA=9,"
+                        # alimiter 默认 level=true 会自动补回 0dB，必须关闭。
+                        "alimiter=limit=0.58:level=false[a]",
                         "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac",
                         "-b:a", "192k", "-shortest", str(final)], check=True)
     else:

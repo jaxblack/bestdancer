@@ -66,10 +66,14 @@ def build_description(cfg: dict, title: str) -> str:
         "本期排行榜：",
     ]
     for i, p in enumerate(picks, 1):
-        creator = p.get("creator", "").strip() or "@待补充"
-        lines.append(f"{i}. {creator}")
+        # 外站作者名不能直接用 @：抖音 contenteditable 会触发账号联想，并在输入
+        # 空格/换行时自动选中第一个候选，实测把 grl1s_nyc、two_eight_three 等
+        # 错误替换成同一个抖音账号 @_YuK、。改用“作者：用户名”保留准确文本。
+        creator = p.get("creator", "").strip().lstrip("@") or "待补充"
+        lines.append(f"{i}. 作者：{creator}")
     if sp.get("creator"):
-        lines.append(f"特别加映： {sp.get('creator','').strip()}")
+        creator = sp.get("creator", "").strip().lstrip("@")
+        lines.append(f"特别加映：作者：{creator}")
     lines += ["", "#热舞榜 #编舞 #街舞 #dance #BestDancer"]
     return "\n".join(lines)
 

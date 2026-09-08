@@ -663,7 +663,8 @@ def main() -> int:
             i.setdefault("source", "llm")
         issues += llm.get("issues", [])
 
-    base = llm.get("overall_score") if llm else 100
+    # LLM 未完成时不是“满分但未通过”；记 0 更准确，也避免历史趋势误解。
+    base = llm.get("overall_score") if llm else (100 if args.no_llm else 0)
     final = max(0, min(100, base - severity_penalty([i for i in issues if i.get("source") == "tech"])))
     has_blocker = any(i.get("severity") == "blocker" for i in issues)
     # 闸门 fail-closed: 要求跑内容评估却没跑成, 一律按不及格处理, 不能当"没问题"放行
