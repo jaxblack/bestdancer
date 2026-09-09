@@ -77,13 +77,12 @@ python3 scripts/auto_episode.py --publish
 
 ## 音频标准
 
-- 每段原片声先归一到 **-18 LUFS**，避免平台间忽大忽小。
-- TTS 与原片声混入前目标差值约 **0–3dB**。
-- 人声出现时使用温和 **3:1 sidechain ducking**，不再使用原先的 15:1 强压制。
-- 最终成片目标 **-16 LUFS / true peak ≤ -1.5dBFS**。
-- manifest 记录 `voice_active_lufs`、`bed_lufs`、`pre_duck_delta_db` 和 ducking ratio。
-- `evaluate_demo.py` 把人声高于原片声 5dB 以上、低于 3dB 以上或 ducking 超过 6:1
-  视为音频平衡问题。
+- **默认不生成 TTS 配音**（2026-09 用户决策），只保留栏目字幕和原视频声音。
+- `render_demo.py --voice` 才会显式开启配音；日常定时任务不传该参数。
+- 每段原片声归一到 **-18 LUFS**，避免平台间一段响、一段轻。
+- 最终成片保留编码峰值检查，true peak 必须 ≤ **-1.5dBFS**。
+- 无配音模式的 evaluation 不再要求人声/原片差值或 ducking，但仍检查原片声响度。
+- 如将来重新开启配音：TTS 与原片声差约 0–3dB，使用温和 3:1 ducking。
 
 ## 版本与回退
 

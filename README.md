@@ -42,6 +42,9 @@ python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发
 运行 Copilot evaluation，通过后自动发布。每日运营文件按日期写入
 `output/daily/YYYY-MM-DD/YYYY-MM-DD_Www-X[_vN].mp4`。
 
+默认成片**不使用 TTS 配音**，仅保留字幕和原视频声音；人工需要配音时才给
+`pipeline/render_demo.py` 传 `--voice`。
+
 `--max-attempts` 控制真正的版本化闭环（默认 5 轮）：
 
 1. 渲染；

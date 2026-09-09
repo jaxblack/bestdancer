@@ -182,6 +182,7 @@ def check_audio_balance(manifest: dict) -> tuple[dict, list[dict]]:
     """检查人声与原片声的相对响度，而不是只看最终整片 LUFS。"""
     mix = manifest.get("audio_mix") or {}
     issues: list[dict] = []
+    voice_enabled = bool(mix.get("voice_enabled"))
     delta = mix.get("pre_duck_delta_db")
     ratio = mix.get("ducking_ratio")
     facts = {
@@ -190,7 +191,16 @@ def check_audio_balance(manifest: dict) -> tuple[dict, list[dict]]:
         "voice_bed_delta_db": delta,
         "ducking_ratio": ratio,
         "final_target_lufs": mix.get("final_target_lufs"),
+        "voice_enabled": voice_enabled,
     }
+    if not voice_enabled:
+        # 无配音模式只保留字幕和原视频声，不需要人声/原片响度差或 ducking。
+        if mix.get("bed_lufs") is None:
+            issues.append(issue(
+                "major", "音频平衡",
+                "无配音模式没有记录原视频声响度",
+                "重新渲染并写入 bed_lufs"))
+        return facts, issues
     if delta is None:
         issues.append(issue(
             "major", "音频平衡",

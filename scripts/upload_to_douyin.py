@@ -135,9 +135,9 @@ def push_file_via_cdp(ctx, pg, mp4: Path):
 
 
 def push_file(ctx, pg, mp4: Path):
-    """发布文件已由 prepare_upload_file 控制在 48MiB 内，走原生上传最稳定。"""
-    if mp4.stat().st_size >= 48 * 1024 * 1024:
-        raise RuntimeError("发布文件仍超过 48MiB，拒绝走已知会崩溃的大文件 CDP 路径")
+    """发布文件已由 prepare_upload_file 控制在 40MiB 内，走原生上传最稳定。"""
+    if mp4.stat().st_size >= 40 * 1024 * 1024:
+        raise RuntimeError("发布文件仍超过 40MiB，拒绝走不稳定的大文件上传路径")
     pg.locator('input[type="file"]').first.set_input_files(str(mp4))
 
 
@@ -147,7 +147,8 @@ def prepare_upload_file(mp4: Path) -> Path:
     Chrome 152 实测连续两次在 77MB 文件 DOM.setFileInputFiles 后 target crashed；
     32.9MB 副本走 Playwright 原生上传一次成功。
     """
-    limit = 48 * 1024 * 1024
+    # Playwright 文档上限是50MB，但实测49.9MB也会使Chrome页面关闭；留到40MiB。
+    limit = 40 * 1024 * 1024
     if mp4.stat().st_size < limit:
         return mp4
     output = mp4.with_name(mp4.stem + "_publish.mp4")
@@ -159,11 +160,11 @@ def prepare_upload_file(mp4: Path) -> Path:
          "-of", "default=nk=1:nw=1", str(mp4)],
         capture_output=True, text=True, check=True)
     duration = float(probe.stdout.strip())
-    # 目标 39MiB，给容器/音频留余量。不能设 1.8Mbps 的硬下限：
+    # 目标 34MiB，给容器/音频留余量。不能设 1.8Mbps 的硬下限：
     # 210s 视频即使 1.8Mbps + 192kbps 音频也会超过 48MiB。
     video_bps = int(max(
         600_000,
-        min(4_500_000, (39 * 1024 * 1024 * 8 / duration) - 220_000)))
+        min(4_500_000, (34 * 1024 * 1024 * 8 / duration) - 220_000)))
     for attempt in range(2):
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4),
@@ -177,7 +178,7 @@ def prepare_upload_file(mp4: Path) -> Path:
         video_bps = int(video_bps * 0.78)
     if not output.exists() or output.stat().st_size >= limit:
         raise RuntimeError(
-            f"发布副本压缩失败或仍超过 48MiB: {output}")
+            f"发布副本压缩失败或仍超过 40MiB: {output}")
     print(f"[+] 大文件自动压缩: {mp4.name} -> {output.name} "
           f"({output.stat().st_size / 1_000_000:.1f} MB)")
     return output
@@ -318,6 +319,33 @@ def wait_and_publish(pg, timeout_sec: int, screenshot: Path) -> dict:
     raise TimeoutError("点击发布后 180s 内未确认发布成功")
 
 
+def start_upload(ctx, pg, mp4: Path, title: str, desc: str,
+                 screenshot: Path):
+    """从干净上传页推文件并填表。"""
+    if "content/post/video" in (pg.url or ""):
+        pg.goto(UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
+        time.sleep(2)
+    print(f"[+] 页面: {pg.url}")
+    print("[+] 推入 mp4 ...")
+    push_file(ctx, pg, mp4)
+    for i in range(90):
+        time.sleep(1)
+        if "content/post/video" in (pg.url or ""):
+            break
+        if i and i % 15 == 0:
+            print(f"    等待跳转... {i}s (URL 仍是 {pg.url})")
+    else:
+        print("[warn] URL 未跳转，但文件可能已入队；继续尝试填表")
+    print(f"[+] 上传已启动: {pg.url}")
+    time.sleep(3)
+    print("[+] 填标题 + 简介 ...")
+    fill_metadata(pg, title, desc)
+    time.sleep(2)
+    pg.screenshot(path=str(screenshot))
+    print(f"[+] 已截图: {screenshot}")
+    return pg
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--week", required=True, help="e.g. 2026-W30-B")
@@ -376,34 +404,8 @@ def main():
         pg.bring_to_front()
         time.sleep(2)
 
-        # 若已在 post/video（前一次残留），直接跳回 upload
-        if "content/post/video" in (pg.url or ""):
-            pg.goto(UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
-            time.sleep(2)
-
-        print(f"[+] 页面: {pg.url}")
-        print("[+] 推入 mp4 via CDP.setFileInputFiles ...")
-        push_file(ctx, pg, mp4)
-
-        # 等页面跳到 post/video；抖音有时上传启动前会先弹认证/预审
-        # 弹窗，跳转可能延后 20-60 秒，别一超时就放弃
-        for i in range(90):
-            time.sleep(1)
-            if "content/post/video" in (pg.url or ""):
-                break
-            if i and i % 15 == 0:
-                print(f"    等待跳转... {i}s (URL 仍是 {pg.url})")
-        else:
-            print("[warn] URL 未跳转，但文件可能已入队；继续尝试填表")
-        print(f"[+] 上传已启动: {pg.url}")
-
-        time.sleep(3)
-        print("[+] 填标题 + 简介 ...")
-        fill_metadata(pg, title, desc)
-
-        time.sleep(2)
-        pg.screenshot(path=args.screenshot)
-        print(f"[+] 已截图: {args.screenshot}")
+        pg = start_upload(
+            ctx, pg, mp4, title, desc, Path(args.screenshot))
         if not args.publish:
             print()
             print("=" * 60)
@@ -412,8 +414,21 @@ def main():
             print("=" * 60)
             return
 
-        receipt = wait_and_publish(
-            pg, args.wait_timeout, Path(args.screenshot))
+        try:
+            receipt = wait_and_publish(
+                pg, args.wait_timeout, Path(args.screenshot))
+        except RuntimeError as error:
+            if "上传/处理失败" not in str(error):
+                raise
+            print("[warn] 抖音上传临时失败，返回全新上传页自动重试一次",
+                  flush=True)
+            pg.goto(UPLOAD_URL, wait_until="domcontentloaded",
+                    timeout=30_000)
+            time.sleep(3)
+            pg = start_upload(
+                ctx, pg, mp4, title, desc, Path(args.screenshot))
+            receipt = wait_and_publish(
+                pg, args.wait_timeout, Path(args.screenshot))
         receipt.update({
             "week": args.week,
             "video": str(mp4.resolve()),

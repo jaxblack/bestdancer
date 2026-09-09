@@ -454,8 +454,12 @@ def render_overlay(seg) -> Image.Image:
     """真片/占位通用的紧凑信息条：上标题星级，下动作字幕，中间尽量留给画面。"""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    # 顶部面板（压矮 + 降不透明度，露出更多舞蹈）
-    d.rounded_rectangle([-40, -40, W + 40, 246], radius=26, fill=(8, 8, 16, 168))
+    # 顶栏接近不透明：原平台常把英文字幕/账号压在同一区域，半透明时会透出来
+    # 与标题、署名、星级串行。顶部 246px 本来就是栏目安全区，直接遮住更清楚。
+    panel_alpha = max(180, min(255, int(seg.get("top_panel_alpha", 238))))
+    d.rounded_rectangle(
+        [-40, -40, W + 40, 246], radius=26,
+        fill=(8, 8, 16, panel_alpha))
     tag_bg = ACCENT if seg["type"] == "top" else CB
     pill(d, W / 2, 32, seg["tag"], F_TAG, BG, tag_bg)
     # 标题按字号阶梯自适应, 一行放不下就降一号 —— 之前只试了 F_TITLE/F_MID 两档,
@@ -495,8 +499,12 @@ def render_overlay(seg) -> Image.Image:
     # 中部 AI 口播大字幕（半透明黑底 + 大白字）
     vo_cap = seg.get("vo_caption", "")
     if vo_cap:
-        vo_lines = wrap(d, vo_cap, F_SUB, W - 2 * MARGIN - 40)[:3]
-        line_h = F_SUB.size + 14
+        caption_font = F_SUB
+        if d.textlength(vo_cap, font=caption_font) > W - 2 * MARGIN - 40:
+            caption_font = F_SMALL
+        vo_lines = wrap(
+            d, vo_cap, caption_font, W - 2 * MARGIN - 40)[:2]
+        line_h = caption_font.size + 14
         box_h = line_h * len(vo_lines) + 30
         # 往下压到接近底边: 原来悬在 H-232 处, 正好横在舞者腿上, 挡住脚步和重心 ——
         # 对要看动作的初学者最致命 (评估器点名过)。贴底能把中间画面整个让出来。
@@ -505,7 +513,7 @@ def render_overlay(seg) -> Image.Image:
                             radius=18, fill=(0, 0, 0, 190))
         y = box_top + 15 + line_h / 2
         for ln in vo_lines:
-            d.text((W / 2, y), ln, font=F_SUB, fill=WHITE, anchor="mm")
+            d.text((W / 2, y), ln, font=caption_font, fill=WHITE, anchor="mm")
             y += line_h
     # 底部面板已移除（用户 2026-07 要求：内容少没必要，让画面更干净）
     return img
@@ -780,7 +788,10 @@ def normalize_clip(src, dst, dur, ff, start=0.0, brightness=0.0):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("week")
-    ap.add_argument("--no-audio", action="store_true")
+    ap.add_argument("--voice", action="store_true",
+                    help="显式开启 TTS 配音；默认仅保留字幕和原视频声音")
+    ap.add_argument("--no-audio", action="store_true",
+                    help=argparse.SUPPRESS)  # 兼容旧命令，等价于不开配音
     args = ap.parse_args()
 
     import imageio.v2 as imageio
@@ -843,9 +854,10 @@ def main() -> int:
     tmp_dir = REPO / "output" / "tmp" / args.week
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    # 配音：优先 edge-tts 神经女声，失败回退 SAPI
+    # 配音默认关闭（用户 2026-09 决策）：保留字幕和原视频声音。
+    # 需要配音时必须显式传 --voice；失败才回退 SAPI。
     audio_ok, engine = False, "none"
-    if not args.no_audio:
+    if args.voice and not args.no_audio:
         try:
             for i, s in enumerate(segs):
                 edge_tts_synth(s["vo"], tts_dir / f"{i:02d}.wav", ff, s.get("voice", VOICE), s.get("voice_rate", RATE))
@@ -1053,18 +1065,19 @@ def main() -> int:
         "size": [W, H],
         "voice_engine": engine,
         "audio_mix": {
+            "voice_enabled": audio_ok,
             "voice_active_lufs": (
                 round(voice_active_lufs, 2) if voice_active_lufs is not None else None),
             "bed_lufs": round(bed_lufs, 2) if bed_lufs is not None else None,
             "voice_gain": 1.15 if audio_ok else 0,
-            "bed_gain": 0.72,
+            "bed_gain": 0.72 if audio_ok else 1.0,
             "pre_duck_delta_db": (
                 round(
                     voice_active_lufs + 20 * math.log10(1.15)
                     - (bed_lufs + 20 * math.log10(0.72)), 2)
                 if voice_active_lufs is not None and bed_lufs is not None else None),
             "ducking_ratio": 3 if audio_ok else 0,
-            "final_target_lufs": -16,
+            "final_target_lufs": -16 if audio_ok else -18,
             "final_target_true_peak_dbfs": -1.5,
         },
         "real_clip_segments": n_real,
