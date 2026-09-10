@@ -357,8 +357,8 @@ def build_segments(cfg: dict) -> list[dict]:
 
     segs.append({"type": "outro", "cid": None,
                  "vo": outro_cfg.get("vo") or "你最喜欢哪一支？评论区见。",
-                 "title1": outro_cfg.get("title1") or "关注追更",
-                 "sub": outro_cfg.get("sub") or "下周同一时间见"})
+                 "title1": outro_cfg.get("title1") or "最喜欢哪支？",
+                 "sub": outro_cfg.get("sub") or "评论区见"})
     return segs
 
 
@@ -436,9 +436,14 @@ def render_titlecard(seg) -> Image.Image:
             d.text((W / 2, 1006), seg["creator"], font=F_SMALL,
                    fill=WHITE, anchor="mm")
     else:
-        d.text((W / 2, 470), "谢谢观看", font=F_HUGE, fill=CA, anchor="mm")
-        d.text((W / 2, 588), "关注追更 · 下周同一时间见", font=F_SUB, fill=WHITE, anchor="mm")
-        pill(d, W / 2, 672, "＋ 关注", F_MID, BG, CB, pad=40)
+        # 片尾必须使用 config/evaluation 写回的 title1/sub，不能硬编码成通用关注页。
+        # 否则 retitle_segment 每轮都“执行成功”但画面永远不变。
+        title = seg.get("title1") or "你最喜欢哪支？"
+        sub = seg.get("sub") or "评论区见"
+        title_font = F_HUGE if len(title) <= 7 else F_MID
+        d.text((W / 2, 470), title, font=title_font, fill=CA, anchor="mm")
+        d.text((W / 2, 588), sub, font=F_SUB, fill=WHITE, anchor="mm")
+        pill(d, W / 2, 672, "评论互动", F_MID, BG, CB, pad=40)
     return img
 
 
@@ -804,14 +809,21 @@ def main() -> int:
         cfg_path = cfg_dir / f"{args.week}.example.json"
     cfg = json.loads(cfg_path.read_text("utf-8"))
     render_settings = cfg.get("render_settings") or {}
+    include_classic = bool(render_settings.get("include_classic", False))
     selected_clip_ids = [pick.get("id") for pick in cfg.get("picks", []) if pick.get("id")]
     classic_id = cfg.get("classic_comeback", {}).get("id")
-    if classic_id:
+    if include_classic and classic_id:
         selected_clip_ids.append(classic_id)
     missing_clips = [candidate_id for candidate_id in selected_clip_ids if not find_clip(args.week, candidate_id)]
     if missing_clips:
         raise SystemExit("入选舞段尚未下载，拒绝渲染占位成片: " + ", ".join(missing_clips))
     segs = build_segments(cfg)
+    include_intro = bool(render_settings.get("include_intro", False))
+    if not include_intro:
+        # 用户 2026-09 决策：暂时关闭片头，成片直接从 No.5 舞段开始。
+        segs = [seg for seg in segs if seg["type"] != "intro"]
+    if not include_classic:
+        segs = [seg for seg in segs if seg["type"] != "classic"]
     for seg in segs:
         if seg["type"] == "intro":
             seg["scrim_alpha"] = max(
@@ -857,7 +869,8 @@ def main() -> int:
     # 配音默认关闭（用户 2026-09 决策）：保留字幕和原视频声音。
     # 需要配音时必须显式传 --voice；失败才回退 SAPI。
     audio_ok, engine = False, "none"
-    if args.voice and not args.no_audio:
+    voice_requested = bool(args.voice and not args.no_audio)
+    if voice_requested:
         try:
             for i, s in enumerate(segs):
                 edge_tts_synth(s["vo"], tts_dir / f"{i:02d}.wav", ff, s.get("voice", VOICE), s.get("voice_rate", RATE))
@@ -876,17 +889,25 @@ def main() -> int:
                 engine = "sapi"
             except Exception as e2:  # noqa: BLE001
                 print(f"[warn] SAPI 也失败({e2})，出无声样片")
+        if not audio_ok:
+            raise SystemExit("已显式要求 --voice，但所有 TTS 引擎均失败，拒绝无声降级")
 
-    # 节奏: 每段 20s × 6 段 = 两分钟, 评估器反复报"榜单推进缓慢"。
-    # 收到 15s 上限后整片约 95s。但**每段都卡满同一个上限**又会显得机械
-    # (评估器原话: "各推荐段几乎都固定为15.2秒"), 所以让名次越靠前给的时间越多:
-    # 第5名 11s 起步, 第1名 15s, 既有节奏变化又把时间给到最值得看的那支。
+    # 用户 2026-09 决策：每个 TOP/特别加映舞段统一展示 20 秒。
+    # lock_dance_duration=true 时 evaluation 不得缩短，质量不足应换选段/换素材。
+    dance_duration = max(
+        10.0, min(30.0, float(
+            render_settings.get("dance_segment_duration_sec", 20.0))))
+    lock_dance_duration = bool(
+        render_settings.get("lock_dance_duration", True))
     default_dur = {"intro": float(render_settings.get("intro_duration_sec", 2.6)),
-                   "top": 13.0, "classic": 12.0, "outro": 5.0}
-    min_dur = {"intro": 1.6, "top": 10.0, "classic": 10.0, "outro": 5.0}
-    max_dur = {"intro": 3.0, "top": 15.0, "classic": 13.0, "outro": 6.0}
+                   "top": dance_duration, "classic": dance_duration, "outro": 5.0}
+    min_dur = {"intro": 1.6, "top": dance_duration,
+               "classic": dance_duration, "outro": 5.0}
+    max_dur = {"intro": 3.0, "top": dance_duration,
+               "classic": dance_duration, "outro": 6.0}
     duration_scale = max(0.6, min(1.0, float(render_settings.get("duration_scale", 1.0))))
-    max_dur["classic"] *= duration_scale
+    if not lock_dance_duration:
+        max_dur["classic"] *= duration_scale
     rank_max = {5: 11.5 * duration_scale, 4: 12.5 * duration_scale,
                 3: 13.5 * duration_scale, 2: 14.5 * duration_scale,
                 1: 15.5 * duration_scale}
@@ -912,12 +933,13 @@ def main() -> int:
         target = selected_dur or clip_dur or default_dur.get(s["type"], 4.0)
         dur = max(target, vo_dur, min_dur.get(s["type"], 3.0))
         dur = min(dur, max_dur.get(s["type"], 30.0))
-        # TOP 段按名次给不同上限, 避免每段都卡在同一个数字上显得机械
-        if s["type"] == "top" and s.get("rank") in rank_max:
+        # 未锁定时才允许旧的差异化时长；每日标准默认锁定20秒。
+        if (not lock_dance_duration and s["type"] == "top"
+                and s.get("rank") in rank_max):
             dur = min(dur, max(rank_max[s["rank"]], min_dur["top"]))
-        if s.get("target_duration_sec"):
+        if not lock_dance_duration and s.get("target_duration_sec"):
             dur = min(dur, max(float(s["target_duration_sec"]), min_dur.get(s["type"], 3.0)))
-        if selected_dur:
+        if selected_dur and not lock_dance_duration:
             dur = min(dur, selected_dur)
         if audio_ok:
             wavs.append(wp)
@@ -953,7 +975,10 @@ def main() -> int:
             e["seg"]["creator"] = top1_creator
         if clip:
             dst = tmp_dir / f"bg_{i:02d}.mp4"
-            want = e["adur"] + GAP
+            # stable_window 与逐段 evaluation 使用相同的内容时长；GAP 只是转场尾帧，
+            # 不应改变选段起点。
+            content_dur = e["adur"]
+            render_dur = content_dur + GAP
             start = e["seg"].get("clip_start_sec", 0.0)
             if not e["seg"].get("clip_start_explicit") and not start:
                 # 人工没指定起点时, 自动挑一段不跨镜头切换的窗口
@@ -962,13 +987,15 @@ def main() -> int:
                         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
                          "-of", "default=noprint_wrappers=1:nokey=1", str(clip)],
                         text=True).strip()
-                    start = stable_window(clip, want, float(probe), ff)
+                    start = stable_window(clip, content_dur, float(probe), ff)
                 except Exception:
                     start = 0.0
                 if start:
                     print(f"[cut] {clip.name} 避开镜头切换, 从 {start:.1f}s 起")
             try:
-                normalize_clip(clip, dst, want, ff, start, e["seg"].get("brightness", 0.0))
+                normalize_clip(
+                    clip, dst, render_dur, ff, start,
+                    e["seg"].get("brightness", 0.0))
                 e["bg"] = dst
                 e["src"] = clip.name
             except Exception as ex:  # noqa: BLE001
@@ -1064,6 +1091,14 @@ def main() -> int:
         "fps": FPS,
         "size": [W, H],
         "voice_engine": engine,
+        "production_requirements": {
+            "include_intro": include_intro,
+            "include_classic": include_classic,
+            "dance_segment_duration_sec": dance_duration,
+            "lock_dance_duration": lock_dance_duration,
+            "voice_enabled": audio_ok,
+            "voice_requested": voice_requested,
+        },
         "audio_mix": {
             "voice_enabled": audio_ok,
             "voice_active_lufs": (

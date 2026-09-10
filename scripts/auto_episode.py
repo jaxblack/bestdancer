@@ -604,6 +604,7 @@ def apply_autofix(target: str, report: dict) -> bool:
     cfg = json.loads(cfg_path.read_text())
     manifest = json.loads(manifest_path.read_text())
     seg_to_cid = {s["index"]: s.get("candidate_id") for s in manifest.get("segments", [])}
+    seg_types = {s["index"]: s.get("type") for s in manifest.get("segments", [])}
     candidates = {c.get("id"): c for c in cfg.get("this_week_candidates", [])}
     classics = {c.get("id"): c for c in cfg.get("classics_pool", [])}
     picks = {p.get("id"): p for p in cfg.get("picks", [])}
@@ -644,11 +645,18 @@ def apply_autofix(target: str, report: dict) -> bool:
                 bad_cids.add(cid)
                 replacements += 1
             mark_addressed(seg_i, "all")
-        elif kind == "retitle_segment" and cid and value_s:
-            for obj in targets(cid):
-                obj["title"] = value_s[:40]
-                obj["title_override"] = value_s[:40]
-            mark_addressed(seg_i, "text_readability", "content_accuracy")
+        elif kind == "retitle_segment" and value_s:
+            if cid:
+                for obj in targets(cid):
+                    obj["title"] = value_s[:40]
+                    obj["title_override"] = value_s[:40]
+                mark_addressed(seg_i, "text_readability", "content_accuracy")
+            elif seg_types.get(seg_i) == "outro":
+                words = value_s[:40].replace("？", "?").split("?", 1)
+                outro = cfg.setdefault("metadata", {}).setdefault("outro", {})
+                outro["title1"] = words[0] + ("？" if len(words) > 1 else "")
+                outro["sub"] = words[1].strip() if len(words) > 1 else "评论区见"
+                mark_addressed(seg_i, "text_readability", "content_accuracy")
         elif kind == "set_creator" and cid and value_s:
             creator = value_s if value_s.startswith("@") else "@" + value_s
             for obj in targets(cid):
@@ -672,7 +680,9 @@ def apply_autofix(target: str, report: dict) -> bool:
                 obj["clip_start_explicit"] = True
             mark_addressed(seg_i, "visual_quality", "pacing",
                            "hook_strength", "hook_per_segment")
-        elif kind == "shorten_segment" and cid and 10 <= value_n <= 15:
+        elif (kind == "shorten_segment" and cid and 10 <= value_n <= 20
+              and not (cfg.get("render_settings") or {}).get(
+                  "lock_dance_duration", True)):
             for obj in targets(cid):
                 obj["target_duration_sec"] = round(value_n, 2)
             mark_addressed(seg_i, "pacing")
@@ -681,11 +691,15 @@ def apply_autofix(target: str, report: dict) -> bool:
                 obj["brightness"] = round(
                     max(-0.3, min(0.3, float(obj.get("brightness", 0)) + value_n)), 3)
             mark_addressed(seg_i, "visual_quality")
-        elif kind == "shorten_all_segments" and 0.7 <= value_n <= 0.95:
+        elif (kind == "shorten_all_segments" and 0.7 <= value_n <= 0.95
+              and not (cfg.get("render_settings") or {}).get(
+                  "lock_dance_duration", True)):
             settings = cfg.setdefault("render_settings", {})
             settings["duration_scale"] = round(
                 min(float(settings.get("duration_scale", 1.0)), value_n), 3)
-        elif kind == "strengthen_intro":
+        elif (kind == "strengthen_intro"
+              and (cfg.get("render_settings") or {}).get(
+                  "include_intro", False)):
             settings = cfg.setdefault("render_settings", {})
             if 1.6 <= value_n <= 2.6:
                 settings["intro_duration_sec"] = round(value_n, 2)

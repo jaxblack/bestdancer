@@ -147,8 +147,10 @@ def main() -> int:
     cfg = json.loads(cfg_path.read_text())
     render = _load_render()
 
+    render_settings = cfg.get("render_settings") or {}
+    include_classic = bool(render_settings.get("include_classic", False))
     items = [("top", p) for p in cfg.get("picks", [])]
-    if cfg.get("classic_comeback"):
+    if include_classic and cfg.get("classic_comeback"):
         items.append(("classic", cfg["classic_comeback"]))
     if not items:
         print("[seg] 本期还没有入选舞段", file=sys.stderr)
@@ -170,7 +172,11 @@ def main() -> int:
             cache = {}
     fp = hashlib.sha1((PROMPT_TPL + json.dumps(SEGMENT_SCHEMA, sort_keys=True)).encode()).hexdigest()[:8]
 
-    # 渲染时每段实际时长(和 render_demo 的 rank_max 保持一致)
+    fixed_duration = float(
+        render_settings.get("dance_segment_duration_sec", 20.0))
+    locked_duration = bool(
+        render_settings.get("lock_dance_duration", True))
+    # 旧的非锁定模式保留名次差异化；每日标准评估实际20秒窗口。
     rank_dur = {5: 11.5, 4: 12.5, 3: 13.5, 2: 14.5, 1: 15.5}
 
     jobs = []
@@ -180,7 +186,11 @@ def main() -> int:
             print(f"[seg] {pk.get('id')} 没有落盘素材, 跳过")
             continue
         total = probe_dur(clip)
-        want = rank_dur.get(pk.get("rank"), 13.0) if kind == "top" else 13.0
+        if locked_duration:
+            want = fixed_duration
+        else:
+            want = rank_dur.get(
+                pk.get("rank"), 13.0) if kind == "top" else 13.0
         want = min(want, max(total - 0.2, 1.0))
         start = (float(pk.get("clip_start_sec") or 0)
                  if pk.get("clip_start_explicit")

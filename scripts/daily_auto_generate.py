@@ -238,6 +238,8 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
         for x in a.get("classics_pool", [])
         if x.get("url", "") not in used]
     cfg["deleted_ids"] = list(a.get("deleted_ids", []))
+    render_settings = cfg.get("render_settings") or {}
+    include_classic = bool(render_settings.get("include_classic", False))
 
     def mkpick(rec, rank, dt=None, stars=None):
         pp = copy.deepcopy(rec)
@@ -255,7 +257,7 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
         return pp
 
     cfg["picks"] = [mkpick(t[2], i+1) for i, t in enumerate(top)]
-    if len(opts) >= 6:
+    if include_classic and len(opts) >= 6:
         cfg["classic_comeback"] = mkpick(opts[5][2], 6)
     else:
         cfg["classic_comeback"] = {}
@@ -288,7 +290,7 @@ def build_week(week: str, edition: str, pool_path: Path | None = None) -> tuple[
                      "voice":"zh-CN-XiaoyiNeural","voice_rate":"+20%","subtitle":[],
                      "on_screen":{"stars":int(pp["difficulty"]["stars"]),"tag":f"本周No.{pp['rank']}","core_moves":[pp["dance_type"]]},"beginner_tip":""})
     sp = cfg["classic_comeback"]
-    if sp:
+    if include_classic and sp:
         narr.append({"segment":"classic","rank":None,"vo":mkvo(None,sp["dance_type"],sp.get("song",""),sp.get("creator",""),True),
                      "voice":"zh-CN-XiaoyiNeural","voice_rate":"+20%","subtitle":[],
                      "on_screen":{"stars":int(sp["difficulty"]["stars"]),"tag":"特别加映","core_moves":[sp["dance_type"]]},"beginner_tip":""})

@@ -84,6 +84,15 @@ python3 scripts/auto_episode.py --publish
 - 无配音模式的 evaluation 不再要求人声/原片差值或 ducking，但仍检查原片声响度。
 - 如将来重新开启配音：TTS 与原片声差约 0–3dB，使用温和 3:1 ducking。
 
+## 当前成片结构
+
+- **不使用片头**（`include_intro=false`），视频直接从 No.5 舞段开始。
+- 默认只做 **TOP5**（`include_classic=false`），不为凑“特别加映”降低素材质量。
+- 每个舞段固定 **20 秒**（`dance_segment_duration_sec=20`、
+  `lock_dance_duration=true`）。Evaluation 不得建议缩短用户指定时长；如果某段
+  20 秒内表现力不足，应换选段或换素材。
+- 片尾保留“最喜欢哪支？评论区见”的互动文案。
+
 ## 版本与回退
 
 - `output/<week>_demo.mp4`：当前最新版。

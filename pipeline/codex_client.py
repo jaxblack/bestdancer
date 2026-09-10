@@ -115,7 +115,8 @@ def run_codex_json(prompt: str, schema: dict, work_dir: Path,
                    images: list[Path] | None = None,
                    model: str | None = None, timeout: int = 900,
                    codex_bin: str | None = None,
-                   tag: str = "codex") -> tuple[dict | None, str]:
+                   tag: str = "codex",
+                   _retry_invalid_json: bool = True) -> tuple[dict | None, str]:
     """按 BESTDANCER_AI_PROVIDER 调 Copilot 或 Codex，返回结构化 JSON。"""
     provider = os.environ.get(AI_PROVIDER_ENV, "codex").lower()
     codex_bin = codex_bin or find_codex()
@@ -201,9 +202,25 @@ def run_codex_json(prompt: str, schema: dict, work_dir: Path,
     try:
         parsed = json.loads(_strip_json_controls(raw))
     except json.JSONDecodeError as e:
+        if provider == "copilot" and _retry_invalid_json:
+            return run_codex_json(
+                prompt + (
+                    "\n\n上一次回答不是合法 JSON。请重新生成完整结果，严格遵守 schema；"
+                    "不要省略逗号、引号或括号，不要输出任何 JSON 以外的文字。"),
+                schema, work_dir, images=images, model=model, timeout=timeout,
+                codex_bin=codex_bin, tag=tag,
+                _retry_invalid_json=False)
         return None, f"{provider} 结果不是合法 JSON: {e}; 原文前 400 字: {raw[:400]}"
     schema_errors = _validate_schema(parsed, schema)
     if schema_errors:
+        if provider == "copilot" and _retry_invalid_json:
+            return run_codex_json(
+                prompt + (
+                    "\n\n上一次 JSON 不符合 schema。请重新生成，确保所有 required 字段、"
+                    "类型、enum 和数值范围完全正确。只输出 JSON。"),
+                schema, work_dir, images=images, model=model, timeout=timeout,
+                codex_bin=codex_bin, tag=tag,
+                _retry_invalid_json=False)
         return None, (
             f"{provider} JSON 不符合 schema: {'; '.join(schema_errors[:8])}")
     return parsed, ""

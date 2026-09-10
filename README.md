@@ -45,6 +45,8 @@ python3 scripts/auto_episode.py --publish       # 只有评估及格才会进发
 默认成片**不使用 TTS 配音**，仅保留字幕和原视频声音；人工需要配音时才给
 `pipeline/render_demo.py` 传 `--voice`。
 
+当前默认结构：无片头、TOP5、每段固定 20 秒；片尾保留评论互动文案。
+
 `--max-attempts` 控制真正的版本化闭环（默认 5 轮）：
 
 1. 渲染；

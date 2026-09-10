@@ -181,8 +181,10 @@ def check_loudness(video: Path) -> tuple[dict, list[dict]]:
 def check_audio_balance(manifest: dict) -> tuple[dict, list[dict]]:
     """检查人声与原片声的相对响度，而不是只看最终整片 LUFS。"""
     mix = manifest.get("audio_mix") or {}
+    requirements = manifest.get("production_requirements") or {}
     issues: list[dict] = []
     voice_enabled = bool(mix.get("voice_enabled"))
+    voice_requested = bool(requirements.get("voice_requested"))
     delta = mix.get("pre_duck_delta_db")
     ratio = mix.get("ducking_ratio")
     facts = {
@@ -192,7 +194,14 @@ def check_audio_balance(manifest: dict) -> tuple[dict, list[dict]]:
         "ducking_ratio": ratio,
         "final_target_lufs": mix.get("final_target_lufs"),
         "voice_enabled": voice_enabled,
+        "voice_requested": voice_requested,
     }
+    if voice_requested and not voice_enabled:
+        issues.append(issue(
+            "blocker", "音频平衡",
+            "用户要求配音，但成片未实际生成 TTS",
+            "修复 TTS 后重渲；不能把失败降级误标成主动无配音"))
+        return facts, issues
     if not voice_enabled:
         # 无配音模式只保留字幕和原视频声，不需要人声/原片响度差或 ducking。
         if mix.get("bed_lufs") is None:
@@ -436,6 +445,14 @@ issues 里 severity 用 blocker(必须改)/major(建议改)/minor(可忍受);
 auto_fixable=true 表示这个问题能靠改渲染参数/重选片段/重生成文案解决,
 不需要重新去找素材。segment_index 用清单里的段号, 对不上就填 -1。
 
+先读取渲染清单中的 production_requirements，它是用户明确指定的成片格式，优先级高于
+你的通用短视频偏好：
+- include_intro=false 时，直接从 No.5 开始是正确行为，不要要求增加片头。
+- include_classic=false 时，本期明确只做 TOP5；不要要求增加“特别加映”。
+- lock_dance_duration=true 时，每个舞段固定为指定秒数；不要因“整体偏长”建议缩短。
+  应评价这 20 秒内部是否都值得保留；若整段表现力不足，建议换选段或 replace_segment。
+- voice_enabled=false 时，无配音是正确行为；字幕 + 原视频声音即可，不要要求增加口播。
+
 最后把能自动执行的修改写进 repair_actions。它不是泛泛建议, 而是下一轮渲染会直接执行的
 动作, 必须严格使用下面的 action:
 - replace_segment: 整段表现力/画质/竖版适配很差, 换后面的候选顶上。value 留空/0。
@@ -487,6 +504,11 @@ def build_prompt(manifest: dict, frames: list[dict], tech: dict) -> str:
     lines = [PROMPT_HEADER, "", "## 渲染清单", ""]
     lines.append(f"期号: {manifest.get('week')}  总时长: {manifest.get('total_sec')}s  "
                  f"画幅: {manifest.get('size')}")
+    lines.append(
+        "用户指定格式: "
+        + json.dumps(
+            manifest.get("production_requirements") or {},
+            ensure_ascii=False))
     for seg in manifest.get("segments", []):
         exp = seg.get("expect_on_screen", {})
         lines.append(
